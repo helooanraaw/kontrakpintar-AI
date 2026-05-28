@@ -259,7 +259,43 @@ function DashboardPageContent() {
         console.error("Gagal membaca session:", e);
       }
       setAuthLoading(false);
-      loadHistory();
+
+      // Simpan draf tamu sebelum login jika ada
+      const savePendingDraft = async () => {
+        const pending = localStorage.getItem("kontrakpintar_pending_save");
+        if (pending) {
+          try {
+            const item = JSON.parse(pending);
+            if (item.type === "analysis") {
+              await saveAnalysisToHistory(
+                item.title,
+                item.contractText,
+                item.score,
+                item.redFlagsCount,
+                item.analysisResult
+              );
+            } else if (item.type === "draft") {
+              await saveSPKToHistory(
+                item.title,
+                item.pihakPertama,
+                item.pihakKedua,
+                item.detailJasa,
+                item.pembayaran,
+                item.draftText,
+                item.instruksiKhusus
+              );
+            }
+          } catch (err) {
+            console.error("Gagal menyimpan draf tertunda:", err);
+          } finally {
+            localStorage.removeItem("kontrakpintar_pending_save");
+          }
+        }
+        // Muat riwayat setelah data tersimpan
+        loadHistory();
+      };
+
+      savePendingDraft();
       loadGlossary();
       const rand = Math.floor(Math.random() * EDUCATIONAL_TIPS.length);
       setSelectedTip(EDUCATIONAL_TIPS[rand]);
@@ -677,8 +713,8 @@ function DashboardPageContent() {
                           </span>
                         </div>
 
-                        <div className="relative h-36 bg-fog-gray/30 rounded-lg border border-border-light/50 overflow-hidden pt-4 px-2">
-                          <svg className="w-full h-[90px]" viewBox="0 0 300 90" preserveAspectRatio="none">
+                        <div className="relative h-40 bg-fog-gray/30 rounded-lg border border-border-light/50 overflow-hidden pt-4 px-2">
+                          <svg className="w-full h-[120px]" viewBox="0 0 300 90" preserveAspectRatio="none">
                             <defs>
                               <linearGradient id="area-gradient" x1="0" y1="0" x2="0" y2="1">
                                 <stop offset="0%" stopColor="var(--color-electric-blue)" stopOpacity="0.25"/>

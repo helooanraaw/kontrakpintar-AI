@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { auth, googleProvider, isFirebaseConfigured } from "@/lib/firebase";
 import { onAuthStateChanged, signOut, User } from "firebase/auth";
 import { useRouter, usePathname } from "next/navigation";
-import { LogIn, LogOut, User as UserIcon, Loader2 } from "lucide-react";
+import { LogIn, LogOut, User as UserIcon, Loader2, ArrowRight, Shield } from "lucide-react";
 
 export default function AuthButton() {
   const [user, setUser] = useState<User | null>(null);
@@ -74,6 +74,7 @@ export default function AuthButton() {
     if (isFirebaseConfigured && auth) {
       try {
         await signOut(auth);
+        localStorage.removeItem("kontrakpintar_auth");
         router.push("/");
       } catch (error) {
         console.error("Logout failed:", error);
@@ -125,10 +126,20 @@ export default function AuthButton() {
   return (
     <button
       onClick={handleLoginClick}
-      className="flex items-center gap-2 bg-[#00262b] text-white hover:bg-[#0b363b] px-5 py-2 rounded-full text-xs font-bold shadow-xs transition-all active:scale-95 border-0 cursor-pointer"
+      className="flex items-center justify-center gap-1.5 text-xs font-bold px-5 py-2 rounded-full text-white cursor-pointer transition-shadow duration-200 border-0 w-full sm:w-auto"
+      style={{
+        background: "linear-gradient(135deg, #00262b 0%, #0b363b 100%)",
+        boxShadow: "0 2px 8px rgba(0, 38, 43, 0.15)",
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.boxShadow = "0 4px 16px rgba(0, 38, 43, 0.25)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = "0 2px 8px rgba(0, 38, 43, 0.15)";
+      }}
     >
-      <LogIn size={14} />
-      <span>Masuk Workspace</span>
+      <span>Mulai</span>
+      <ArrowRight size={12} className="ml-0.5 opacity-80" />
     </button>
   );
 }

@@ -20,11 +20,13 @@ import {
   Trash2,
   GitCompare,
   FileText,
-  FolderOpen
+  FolderOpen,
+  Printer
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { GlossaryWrapper } from "./GlossaryWrapper";
 import type { AnalysisResult } from "@/lib/gemini";
+import { checkCanGenerate, incrementUsageCount } from "@/lib/limits";
 
 // Contoh draf kontrak untuk demo
 const SAMPLE_CONTRACT = `SURAT PERJANJIAN KERJASAMA
@@ -176,6 +178,7 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
   const [error, setError] = useState<string | null>(null); // Global error
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [showTrialModal, setShowTrialModal] = useState(false);
+  const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [showDiff, setShowDiff] = useState<Record<number, boolean>>({});
   const [showSidebar, setShowSidebar] = useState(false); // Default hidden for cleaner UI
 
@@ -520,11 +523,13 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
       return;
     }
 
-    const isUserLoggedIn = typeof window !== "undefined" ? !!localStorage.getItem("kontrakpintar_auth") : false;
-    const isTrialUsed = typeof window !== "undefined" ? localStorage.getItem("kontrakpintar_trial_used") === "true" : false;
-
-    if (!isUserLoggedIn && isTrialUsed) {
-      setShowTrialModal(true);
+    const limitCheck = checkCanGenerate();
+    if (!limitCheck.allowed) {
+      if (limitCheck.reason === "guest_limit") {
+        setShowTrialModal(true);
+      } else {
+        setShowDailyLimitModal(true);
+      }
       return;
     }
 
@@ -548,9 +553,7 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
         prev.map((d) => (d.id === activeDocId ? { ...d, result: data } : d))
       );
 
-      if (!isUserLoggedIn) {
-        localStorage.setItem("kontrakpintar_trial_used", "true");
-      }
+      incrementUsageCount();
 
       if (onAnalysisComplete) {
         const title = activeDoc.fileName || `Analisis Kontrak #${Math.floor(Math.random() * 1000)}`;
@@ -573,6 +576,283 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
     setTimeout(() => setCopiedIndex(null), 2000);
+  };
+
+  const handlePrintAnalysisReport = () => {
+    if (!activeDoc || !activeDoc.result) return;
+    const docName = activeDoc.fileName || "Teks Draf Kontrak";
+    const res = activeDoc.result;
+    
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      const redFlagsHtml = res.redFlags && res.redFlags.length > 0
+        ? res.redFlags.map((flag: any, index: number) => `
+            <div class="flag-card ${flag.tingkatKeparahan}">
+              <div class="flag-header">
+                <span class="flag-num">#${index + 1}</span>
+                <span class="flag-title">Klausul: ${flag.pasal || "Pasal Kontrak"}</span>
+                <span class="badge ${flag.tingkatKeparahan}">Resiko ${flag.tingkatKeparahan.toUpperCase()}</span>
+              </div>
+              <div class="flag-body">
+                <p><strong>Analisis Masalah:</strong> ${flag.penjelasan}</p>
+                <div class="proposal-box">
+                  <p class="proposal-title"><strong>Usulan Klausul Revisi (Adil & Protektif):</strong></p>
+                  <p class="proposal-text">${flag.usulanRevisi}</p>
+                </div>
+              </div>
+            </div>
+          `).join("")
+        : "<p class='no-flags'>Tidak ada klausul red flags berbahaya yang terdeteksi.</p>";
+
+      const positiveHtml = res.catatanPositif && res.catatanPositif.length > 0
+        ? `<ul class="positive-list">` + 
+          res.catatanPositif.map((pos: string) => `<li>${pos}</li>`).join("") + 
+          `</ul>`
+        : "<p class='no-flags'>Tidak ada catatan khusus.</p>";
+
+      printWindow.document.write(`
+        <html>
+        <head>
+          <title>Laporan Red Flags - ${docName}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 2.5cm;
+            }
+            body {
+              font-family: 'Times New Roman', Times, serif;
+              line-height: 1.5;
+              color: #00262b;
+              margin: 0;
+              padding: 0;
+            }
+            .header-table {
+              width: 100%;
+              border-collapse: collapse;
+              border-bottom: 2px solid #00262b;
+              margin-bottom: 20px;
+              padding-bottom: 10px;
+            }
+            .title-brand {
+              font-size: 10pt;
+              font-weight: bold;
+              color: #006af2;
+              text-transform: uppercase;
+              letter-spacing: 1px;
+            }
+            .title-report {
+              font-size: 16pt;
+              font-weight: bold;
+              color: #00262b;
+              margin-top: 5px;
+              text-transform: uppercase;
+            }
+            .meta-text {
+              font-size: 10pt;
+              color: #354d51;
+              text-align: right;
+            }
+            .score-section {
+              background: #f4f6f6;
+              border: 1px solid #dcdcdc;
+              border-radius: 8px;
+              padding: 15px;
+              margin-bottom: 25px;
+            }
+            .score-table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            .score-cell {
+              width: 100px;
+              text-align: center;
+              font-size: 24pt;
+              font-weight: bold;
+              color: #006af2;
+              border-right: 1px solid #dcdcdc;
+              padding-right: 15px;
+              vertical-align: middle;
+            }
+            .score-desc-cell {
+              padding-left: 20px;
+              vertical-align: middle;
+            }
+            .score-status {
+              font-size: 12pt;
+              font-weight: bold;
+              color: #00262b;
+              margin-bottom: 5px;
+            }
+            .score-desc {
+              font-size: 10pt;
+              color: #354d51;
+              margin: 0;
+            }
+            h2 {
+              font-size: 12pt;
+              font-weight: bold;
+              text-transform: uppercase;
+              color: #00262b;
+              border-bottom: 1px solid #00262b;
+              padding-bottom: 4px;
+              margin-top: 25px;
+              margin-bottom: 15px;
+              page-break-after: avoid;
+            }
+            .summary-box {
+              font-size: 11pt;
+              text-align: justify;
+              margin-bottom: 20px;
+            }
+            .flag-card {
+              border: 1px solid #dcdcdc;
+              border-radius: 6px;
+              margin-bottom: 15px;
+              page-break-inside: avoid;
+            }
+            .flag-card.kritis { border-left: 5px solid #8b3911; }
+            .flag-card.sedang { border-left: 5px solid #d97706; }
+            .flag-card.ringan { border-left: 5px solid #006af2; }
+            
+            .flag-header {
+              background: #f8fafc;
+              padding: 8px 12px;
+              font-size: 10pt;
+              font-weight: bold;
+              border-bottom: 1px solid #e2e8f0;
+            }
+            .flag-num {
+              color: #354d51;
+              margin-right: 8px;
+            }
+            .flag-title {
+              color: #00262b;
+            }
+            .badge {
+              font-size: 8pt;
+              font-weight: bold;
+              padding: 2px 8px;
+              border-radius: 4px;
+              text-transform: uppercase;
+              float: right;
+            }
+            .badge.kritis { background: #fee2e2; color: #8b3911; }
+            .badge.sedang { background: #fef3c7; color: #b45309; }
+            .badge.ringan { background: #dbeafe; color: #1d4ed8; }
+            
+            .flag-body {
+              padding: 12px;
+              font-size: 10pt;
+              clear: both;
+            }
+            .flag-body p {
+              margin: 0 0 8px;
+              text-align: justify;
+            }
+            .proposal-box {
+              background: #f0fdf4;
+              border: 1px solid #bbf7d0;
+              border-radius: 4px;
+              padding: 10px;
+              margin-top: 8px;
+            }
+            .proposal-title {
+              font-size: 9pt;
+              color: #15803d;
+              margin: 0 0 4px !important;
+            }
+            .proposal-text {
+              font-family: 'Courier New', Courier, monospace;
+              font-size: 9.5pt;
+              color: #14532d;
+              margin: 0 !important;
+              white-space: pre-wrap;
+              text-align: justify;
+            }
+            .positive-list {
+              font-size: 10pt;
+              padding-left: 20px;
+              margin: 0 0 20px;
+            }
+            .positive-list li {
+              margin-bottom: 6px;
+              text-align: justify;
+            }
+            .no-flags {
+              font-size: 10pt;
+              color: #354d51;
+              font-style: italic;
+            }
+            .footer-disclaimer {
+              margin-top: 40px;
+              font-size: 8pt;
+              color: #94a3b8;
+              text-align: center;
+              border-top: 1px solid #e2e8f0;
+              padding-top: 10px;
+              page-break-inside: avoid;
+            }
+          </style>
+        </head>
+        <body>
+          <table class="header-table">
+            <tr>
+              <td>
+                <div class="title-brand">KONTRAKPINTAR AI</div>
+                <div class="title-report">Laporan Analisis Risiko Hukum</div>
+              </td>
+              <td class="meta-text" style="vertical-align: bottom;">
+                <strong>Dokumen:</strong> ${docName}<br/>
+                <strong>Tanggal:</strong> ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+              </td>
+            </tr>
+          </table>
+
+          <div class="score-section">
+            <table class="score-table">
+              <tr>
+                <td class="score-cell">${res.skorKeamanan}%</td>
+                <td class="score-desc-cell">
+                  <div class="score-status">
+                    Status Dokumen: ${res.skorKeamanan >= 80 ? "Kontrak Aman & Adil" : res.skorKeamanan >= 50 ? "Butuh Negosiasi Ulang" : "Draf Risiko Tinggi / Bahaya"}
+                  </div>
+                  <p class="score-desc">
+                    Hasil analisis mendeteksi sebanyak <strong>${res.jumlahBahaya} klausul bermasalah</strong> di dalam draf ini. Tinjau rincian red flags dan usulan revisi di bawah untuk menyeimbangkan posisi hukum Anda.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <h2>Ringkasan Eksekutif</h2>
+          <div class="summary-box">${res.ringkasan}</div>
+
+          <h2>Detail Temuan Red Flags (${res.jumlahBahaya})</h2>
+          ${redFlagsHtml}
+
+          <h2>Klausul Positif / Proteksi Terdeteksi</h2>
+          ${positiveHtml}
+
+          <h2>Rekomendasi Tindakan Hukum</h2>
+          <div class="summary-box">${res.rekomendasiUmum}</div>
+
+          <div class="footer-disclaimer">
+            Laporan ini dibuat secara otomatis oleh KontrakPintar AI menggunakan analisis model bahasa kecerdasan buatan. Dokumen ini bertujuan untuk bantuan edukasi kepatuhan draf dan bukan merupakan nasihat hukum formal dari pengacara berlisensi.
+          </div>
+
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                setTimeout(function() { window.close(); }, 500);
+              }, 250);
+            };
+          </script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
   };
 
   const toggleDiff = (idx: number) => {
@@ -914,6 +1194,13 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
                     Terdeteksi {activeDoc.result.jumlahBahaya} klausul bermasalah.
                     Pastikan negosiasi ulang sebelum tanda tangan.
                   </p>
+                  <button
+                    onClick={handlePrintAnalysisReport}
+                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-electric-blue border border-electric-blue/35 hover:bg-electric-blue/5 px-2.5 py-1 rounded-lg mt-2 transition-all uppercase tracking-wider"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    Cetak Laporan Red Flags
+                  </button>
                 </div>
               </div>
             </div>
@@ -1101,6 +1388,31 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
                 className="text-xs font-medium text-slate-grille hover:text-midnight-ink pt-1 cursor-pointer bg-transparent border-0"
               >
                 Kembali
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Daily limit modal */}
+      {showDailyLimitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-sm w-full p-6 space-y-5 animate-scale-in text-center">
+            <div className="w-12 h-12 rounded-full bg-red-50 border border-red-200 flex items-center justify-center mx-auto text-red-600">
+              <ShieldAlert className="w-6 h-6 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-base font-bold text-midnight-ink">Batas Harian Tercapai</h3>
+              <p className="text-xs text-slate-grille leading-relaxed">
+                Anda telah menggunakan batas maksimal 8 kali pemindaian dokumen hari ini. Silakan coba lagi besok untuk melindungi stabilitas server kami.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                onClick={() => setShowDailyLimitModal(false)}
+                className="btn-primary w-full h-10 flex items-center justify-center text-xs font-bold"
+              >
+                Mengerti
               </button>
             </div>
           </div>

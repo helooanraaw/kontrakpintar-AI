@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { GlossaryWrapper } from "./GlossaryWrapper";
+import { checkCanGenerate, incrementUsageCount } from "@/lib/limits";
+import { parseMarkdownBlocks, convertMarkdownFormatting } from "@/lib/markdownParser";
 
 const LOADING_STATUSES = [
   "Menganalisis kebutuhan para pihak...",
@@ -141,6 +143,7 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
   const [draft, setDraft] = useState<string | null>(initialDraft || null);
   const [copied, setCopied] = useState(false);
   const [showTrialModal, setShowTrialModal] = useState(false);
+  const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
 
   useEffect(() => {
     if (initialFormData) {
@@ -217,58 +220,74 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
 
   /* ── Parser Markdown ke HTML untuk Word/PDF ── */
   const parseMarkdownToHtml = (md: string): string => {
-    // Pra-pembersihan: hapus sisa ** atau * yang tersesat (bukan bagian dari heading/list)
-    // Pertama, konversi bold yang valid (** ... **) ke <strong>
-    // Lalu, buang semua sisa karakter ** dan * yang tidak berguna
-    const cleanMd = md
-      .replace(/\r/g, "")
-      // Normalisasi: hapus ** dan * yang ada di awal/akhir baris secara mandiri
-      .replace(/^\*{1,2}\s*/gm, "")   // ** atau * di awal baris
-      .replace(/\s*\*{1,2}$/gm, "");  // ** atau * di akhir baris
-
-    const blocks = cleanMd.split(/\n\n+/);
+    const blocks = parseMarkdownBlocks(md);
+    const htmlBlocks: string[] = [];
     
-    return blocks.map((block) => {
-      const trimmed = block.trim();
-      if (!trimmed) return "";
-      
-      // Heading 1
-      if (trimmed.startsWith("# ")) {
-        return `<h1 style="text-align:center;font-size:16pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:24px;margin-bottom:18px;text-transform:uppercase;">${trimmed.substring(2)}</h1>`;
+    blocks.forEach((block) => {
+      switch (block.type) {
+        case "h1":
+          htmlBlocks.push(
+            `<h1 style="text-align:center;font-size:14pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:0;margin-bottom:18pt;text-transform:uppercase;line-height:1.5;">${convertMarkdownFormatting(block.content || "")}</h1>`
+          );
+          break;
+        case "h2":
+          if (block.isPasal) {
+            htmlBlocks.push(
+              `<h2 style="text-align:center;font-size:12pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:24pt;margin-bottom:12pt;text-transform:uppercase;line-height:1.5;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.pasalNum || "")}<br/>${convertMarkdownFormatting(block.pasalTitle || "")}</h2>`
+            );
+          } else {
+            htmlBlocks.push(
+              `<h2 style="text-align:center;font-size:12pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:24pt;margin-bottom:12pt;text-transform:uppercase;line-height:1.5;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.content || "")}</h2>`
+            );
+          }
+          break;
+        case "h3":
+          htmlBlocks.push(
+            `<h3 style="font-size:11pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:12pt;margin-bottom:6pt;line-height:1.5;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.content || "")}</h3>`
+          );
+          break;
+        case "center-bold":
+          htmlBlocks.push(
+            `<p style="text-align:center;font-size:11pt;font-family:'Times New Roman',serif;font-weight:bold;line-height:1.5;margin-top:-6pt;margin-bottom:18pt;color:#000;">${convertMarkdownFormatting(block.content || "")}</p>`
+          );
+          break;
+        case "paragraph":
+          htmlBlocks.push(
+            `<p style="font-size:11pt;font-family:'Times New Roman',serif;text-align:justify;line-height:1.5;margin:0 0 8pt 0;text-indent:1.25cm;color:#000;">${convertMarkdownFormatting(block.content || "")}</p>`
+          );
+          break;
+        case "list":
+          if (block.items) {
+            const listHtml = block.items.map((item) => {
+              if (item.type === "bullet") {
+                return `
+                  <table class="list-table" style="width:100%;border-collapse:collapse;border:none;margin:0 0 6pt;padding:0;page-break-inside:avoid;break-inside:avoid;">
+                    <tr style="border:none;">
+                      <td style="width:1.25cm;padding:0;border:none;"></td>
+                      <td style="width:0.5cm;vertical-align:top;text-align:left;padding:0;font-family:'Times New Roman',serif;font-size:11pt;line-height:1.5;color:#000;border:none;">•</td>
+                      <td style="vertical-align:top;text-align:justify;padding:0;font-family:'Times New Roman',serif;font-size:11pt;line-height:1.5;color:#000;border:none;">${convertMarkdownFormatting(item.content)}</td>
+                    </tr>
+                  </table>
+                `;
+              } else {
+                return `
+                  <table class="list-table" style="width:100%;border-collapse:collapse;border:none;margin:0 0 8pt;padding:0;page-break-inside:avoid;break-inside:avoid;">
+                    <tr style="border:none;">
+                      <td style="width:1.25cm;padding:0;border:none;"></td>
+                      <td style="width:0.75cm;vertical-align:top;text-align:left;padding:0;font-family:'Times New Roman',serif;font-size:11pt;line-height:1.5;font-weight:bold;color:#000;border:none;">${item.prefix}</td>
+                      <td style="vertical-align:top;text-align:justify;padding:0;font-family:'Times New Roman',serif;font-size:11pt;line-height:1.5;color:#000;border:none;">${convertMarkdownFormatting(item.content)}</td>
+                    </tr>
+                  </table>
+                `;
+              }
+            }).join("");
+            htmlBlocks.push(listHtml);
+          }
+          break;
       }
-      // Heading 2
-      if (trimmed.startsWith("## ")) {
-        return `<h2 style="font-size:12pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:20px;margin-bottom:8px;border-bottom:1.5px solid #000;padding-bottom:4px;text-transform:uppercase;">${trimmed.substring(3)}</h2>`;
-      }
-      // Heading 3
-      if (trimmed.startsWith("### ")) {
-        return `<h3 style="font-size:11pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:14px;margin-bottom:6px;">${trimmed.substring(4)}</h3>`;
-      }
-      // List items (bulleted)
-      if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
-        const items = trimmed.split(/\n[*+-]\s+/);
-        const listHtml = items.map(item => {
-          let cleanItem = item.replace(/^[*+-]\s+/, "");
-          // Bersihkan sisa ** dan * dari item list
-          cleanItem = cleanItem.replace(/\*\*(.*?)\*\*/g, "$1");
-          cleanItem = cleanItem.replace(/\*(.*?)\*/g, "$1");
-          return `<li style="font-size:11pt;font-family:'Times New Roman',serif;text-align:justify;line-height:1.5;margin-bottom:6px;margin-left:20px;">${cleanItem}</li>`;
-        }).join("");
-        return `<ul style="margin-bottom:10px;padding-left:0;">${listHtml}</ul>`;
-      }
-      
-      // Paragraph biasa
-      let processed = trimmed;
-      // Bersihkan sisa ** dan * dari paragraf biasa (ubah jadi teks biasa, bukan bold)
-      processed = processed.replace(/\*\*(.*?)\*\*/g, "$1");
-      processed = processed.replace(/\*(.*?)\*/g, "$1");
-      // Hapus ** atau * yang tersisa sendirian
-      processed = processed.replace(/\*{1,2}/g, "");
-      // Line break tunggal diganti <br/>
-      processed = processed.replace(/\n/g, "<br/>");
-      
-      return `<p style="font-size:11pt;font-family:'Times New Roman',serif;text-align:justify;line-height:1.5;text-indent:0.5in;margin:0 0 10pt;">${processed}</p>`;
-    }).join("");
+    });
+    
+    return htmlBlocks.join("");
   };
 
   /* ── Ekspor ke Word ── */
@@ -278,33 +297,95 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
     
     // Blok tanda tangan formal dalam tabel Word tanpa garis tepi
     const signatureHtml = `
-      <br/><br/><br/>
-      <table style="width:100%;font-family:'Times New Roman',serif;font-size:11pt;margin-top:40px;border-collapse:collapse;border:none;">
+      <table class="signature-table" style="width:100%;font-family:'Times New Roman',serif;font-size:11pt;margin-top:50pt;border-collapse:collapse;border:none;page-break-inside:avoid;break-inside:avoid;">
         <tr style="border:none;">
-          <td style="width:50%;text-align:center;border:none;padding-bottom:70px;vertical-align:top;">
-            <strong>PIHAK PERTAMA</strong><br/>
-            ${formData.pihakPertama.nama || "( ..................... )"}
+          <td style="width:50%;text-align:center;border:none;vertical-align:top;padding-bottom:60pt;line-height:1.5;">
+            <strong>PIHAK PERTAMA</strong>
           </td>
-          <td style="width:50%;text-align:center;border:none;padding-bottom:70px;vertical-align:top;">
-            <strong>PIHAK KEDUA</strong><br/>
-            ${formData.pihakKedua.nama || "( ..................... )"}
+          <td style="width:50%;text-align:center;border:none;vertical-align:top;padding-bottom:60pt;line-height:1.5;">
+            <strong>PIHAK KEDUA</strong>
           </td>
         </tr>
         <tr style="border:none;">
-          <td style="width:50%;text-align:center;border:none;vertical-align:bottom;">
-            ___________________________<br/>
-            Nama: ${formData.pihakPertama.nama || "....................."}
+          <td style="width:50%;text-align:center;border:none;vertical-align:bottom;line-height:1.5;">
+            <strong><u>${formData.pihakPertama.nama || "....................."}</u></strong>
           </td>
-          <td style="width:50%;text-align:center;border:none;vertical-align:bottom;">
-            ___________________________<br/>
-            Nama: ${formData.pihakKedua.nama || "....................."}
+          <td style="width:50%;text-align:center;border:none;vertical-align:bottom;line-height:1.5;">
+            <strong><u>${formData.pihakKedua.nama || "....................."}</u></strong>
           </td>
         </tr>
       </table>
     `;
 
-    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><title>Surat Perjanjian Kerja</title><style>@page{size:8.5in 11.0in;margin:1.0in 1.0in 1.0in 1.0in;mso-header-margin:.5in;mso-footer-margin:.5in;mso-paper-source:0;}body{font-family:'Times New Roman',serif;line-height:1.5;font-size:11pt;padding:10px;}h1{text-align:center;font-size:16pt;font-weight:bold;margin-bottom:18pt;text-transform:uppercase;}h2{font-size:12pt;font-weight:bold;margin-top:16pt;margin-bottom:6pt;text-transform:uppercase;border-bottom:1.5px solid #000;padding-bottom:2px;}p{font-size:11pt;text-align:justify;text-indent:0.5in;margin:0 0 10pt;}li{font-size:11pt;text-align:justify;margin-bottom:6pt;}</style></head><body>`;
-    const footer = "</body></html>";
+    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+<head>
+<title>Surat Perjanjian Kerja</title>
+<!--[if gte mso 9]>
+<xml>
+ <w:WordDocument>
+  <w:View>Print</w:View>
+  <w:Zoom>100</w:Zoom>
+  <w:DoNotOptimizeForBrowser/>
+ </w:WordDocument>
+</xml>
+<![endif]-->
+<style>
+@page Section1 {
+  size: 21.0cm 29.7cm; /* A4 */
+  margin: 4.0cm 3.0cm 3.0cm 4.0cm; /* Top, Right, Bottom, Left */
+  mso-page-orientation: portrait;
+}
+div.Section1 {
+  page: Section1;
+}
+body {
+  font-family: 'Times New Roman', serif;
+  font-size: 11pt;
+  line-height: 1.5;
+}
+p {
+  margin: 0in 0in 8pt;
+  font-family: 'Times New Roman', serif;
+  font-size: 11pt;
+  line-height: 1.5;
+  text-align: justify;
+}
+h1 {
+  font-family: 'Times New Roman', serif;
+  font-size: 14pt;
+  font-weight: bold;
+  text-align: center;
+  text-transform: uppercase;
+  margin-top: 12pt;
+  margin-bottom: 12pt;
+  line-height: 1.5;
+}
+h2 {
+  font-family: 'Times New Roman', serif;
+  font-size: 12pt;
+  font-weight: bold;
+  text-align: center;
+  text-transform: uppercase;
+  margin-top: 24pt;
+  margin-bottom: 12pt;
+  line-height: 1.5;
+  page-break-after: avoid;
+}
+h3 {
+  font-family: 'Times New Roman', serif;
+  font-size: 11pt;
+  font-weight: bold;
+  margin-top: 12pt;
+  margin-bottom: 6pt;
+  line-height: 1.5;
+  page-break-after: avoid;
+}
+</style>
+</head>
+<body>
+<div class="Section1">`;
+
+    const footer = "</div></body></html>";
     const blob = new Blob(["\ufeff" + header + html + signatureHtml + footer], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -322,25 +403,21 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
     const html = parseMarkdownToHtml(draft);
     
     const signatureHtml = `
-      <table style="width:100%;font-family:'Times New Roman',serif;font-size:11pt;margin-top:50px;border-collapse:collapse;border:none;page-break-inside:avoid;">
+      <table class="signature-table" style="width:100%;font-family:'Times New Roman',serif;font-size:11pt;margin-top:50pt;border-collapse:collapse;border:none;page-break-inside:avoid;break-inside:avoid;">
         <tr style="border:none;">
-          <td style="width:50%;text-align:center;border:none;padding-bottom:70px;vertical-align:top;">
-            <strong>PIHAK PERTAMA</strong><br/>
-            ${formData.pihakPertama.nama || "( ..................... )"}
+          <td style="width:50%;text-align:center;border:none;vertical-align:top;padding-bottom:60pt;line-height:1.5;">
+            <strong>PIHAK PERTAMA</strong>
           </td>
-          <td style="width:50%;text-align:center;border:none;padding-bottom:70px;vertical-align:top;">
-            <strong>PIHAK KEDUA</strong><br/>
-            ${formData.pihakKedua.nama || "( ..................... )"}
+          <td style="width:50%;text-align:center;border:none;vertical-align:top;padding-bottom:60pt;line-height:1.5;">
+            <strong>PIHAK KEDUA</strong>
           </td>
         </tr>
         <tr style="border:none;">
-          <td style="width:50%;text-align:center;border:none;vertical-align:bottom;">
-            ___________________________<br/>
-            Nama: ${formData.pihakPertama.nama || "....................."}
+          <td style="width:50%;text-align:center;border:none;vertical-align:bottom;line-height:1.5;">
+            <strong><u>${formData.pihakPertama.nama || "....................."}</u></strong>
           </td>
-          <td style="width:50%;text-align:center;border:none;vertical-align:bottom;">
-            ___________________________<br/>
-            Nama: ${formData.pihakKedua.nama || "....................."}
+          <td style="width:50%;text-align:center;border:none;vertical-align:bottom;line-height:1.5;">
+            <strong><u>${formData.pihakKedua.nama || "....................."}</u></strong>
           </td>
         </tr>
       </table>
@@ -352,61 +429,69 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
         <html><head><title>Surat Perjanjian Kerja</title>
         <style>
           @page {
-            size: A4;
-            margin: 1.2in 1.0in 1.2in 1.0in;
+            size: A4 portrait;
+            margin: 4cm 3cm 3cm 4cm;
           }
           body {
+            margin: 0;
+            padding: 0;
             font-family: 'Times New Roman', Times, serif;
-            line-height: 1.6;
-            padding: 20px;
+            font-size: 11pt;
+            line-height: 1.5;
             color: #000;
             background: #fff;
           }
+          p {
+            text-align: justify;
+            line-height: 1.5;
+            margin: 0 0 8pt;
+            font-size: 11pt;
+            font-family: 'Times New Roman', Times, serif;
+          }
+          h1, h2, h3 {
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1.5;
+            color: #000;
+          }
           h1 {
             text-align: center;
-            font-size: 16pt;
+            font-size: 14pt;
             text-transform: uppercase;
-            margin-bottom: 24px;
+            margin-top: 0;
+            margin-bottom: 18pt;
             font-weight: bold;
           }
           h2 {
+            text-align: center;
             font-size: 12pt;
-            margin-top: 20px;
-            margin-bottom: 10px;
+            margin-top: 24pt;
+            margin-bottom: 12pt;
             font-weight: bold;
             text-transform: uppercase;
-            border-bottom: 1.5px solid #000;
-            padding-bottom: 4px;
+            page-break-after: avoid;
+            break-after: avoid;
           }
           h3 {
             font-size: 11pt;
-            margin-top: 14px;
-            margin-bottom: 6px;
+            margin-top: 12pt;
+            margin-bottom: 6pt;
             font-weight: bold;
-          }
-          p {
-            text-align: justify;
-            text-indent: 0.5in;
-            margin: 0 0 10pt;
-            font-size: 11pt;
-          }
-          li {
-            font-size: 11pt;
-            text-align: justify;
-            margin-bottom: 6px;
-            margin-left: 20px;
+            page-break-after: avoid;
+            break-after: avoid;
           }
           table {
             width: 100%;
             border-collapse: collapse;
             border: none;
-            margin-top: 40px;
+            margin-top: 50pt;
           }
           td {
             border: none;
-            font-family: 'Times New Roman', serif;
-            font-size: 11pt;
             text-align: center;
+          }
+          .signature-table {
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
           @media print {
             body {
@@ -419,8 +504,10 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
           ${signatureHtml}
           <script>
             window.onload = function() {
-              window.print();
-              setTimeout(function() { window.close(); }, 500);
+              setTimeout(function() {
+                window.print();
+                setTimeout(function() { window.close(); }, 500);
+              }, 250);
             };
           </script>
         </body></html>
@@ -428,15 +515,16 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
       printWindow.document.close();
     }
   };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const isUserLoggedIn = typeof window !== "undefined" ? !!localStorage.getItem("kontrakpintar_auth") : false;
-    const isTrialUsed = typeof window !== "undefined" ? localStorage.getItem("kontrakpintar_trial_used") === "true" : false;
-
-    if (!isUserLoggedIn && isTrialUsed) {
-      setShowTrialModal(true);
+    const limitCheck = checkCanGenerate();
+    if (!limitCheck.allowed) {
+      if (limitCheck.reason === "guest_limit") {
+        setShowTrialModal(true);
+      } else {
+        setShowDailyLimitModal(true);
+      }
       return;
     }
 
@@ -457,9 +545,7 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
       }
 
       setDraft(data.draft);
-      if (!isUserLoggedIn) {
-        localStorage.setItem("kontrakpintar_trial_used", "true");
-      }
+      incrementUsageCount();
 
       if (onDraftComplete) {
         const title = `SPK: ${formData.pihakKedua.nama} - ${formData.pihakPertama.nama}`;
@@ -1033,6 +1119,31 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
                 className="text-xs font-medium text-slate-grille hover:text-midnight-ink pt-1 cursor-pointer bg-transparent border-0"
               >
                 Kembali
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Daily limit modal */}
+      {showDailyLimitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-sm w-full p-6 space-y-5 animate-scale-in text-center">
+            <div className="w-12 h-12 rounded-full bg-red-50 border border-red-200 flex items-center justify-center mx-auto text-red-600">
+              <ShieldAlert className="w-6 h-6 animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-base font-bold text-midnight-ink">Batas Harian Tercapai</h3>
+              <p className="text-xs text-slate-grille leading-relaxed">
+                Anda telah menggunakan batas maksimal 8 kali pembuatan draf dokumen hari ini. Silakan coba lagi besok untuk melindungi stabilitas server kami.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 pt-2">
+              <button
+                onClick={() => setShowDailyLimitModal(false)}
+                className="btn-primary w-full h-10 flex items-center justify-center text-xs font-bold"
+              >
+                Mengerti
               </button>
             </div>
           </div>

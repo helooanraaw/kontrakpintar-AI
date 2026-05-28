@@ -222,12 +222,13 @@ const GENERATE_SYSTEM_INSTRUCTION = `Kamu adalah "KontrakPintar AI", seorang dra
 TUGAS: Buatkan draf SPK formal berdasarkan data yang diberikan pengguna.
 
 ATURAN FORMAT WAJIB (KRITIS - PATUHI 100%):
-1. GUNAKAN HEADING MARKDOWN SAJA untuk judul: # untuk judul utama, ## untuk judul pasal, ### untuk sub-bagian.
-2. JANGAN PERNAH gunakan ** (double asterisk) atau * (single asterisk) di dalam paragraf atau kalimat biasa. Karakter ini dilarang keras.
-3. Untuk menekankan kata penting di dalam kalimat, gunakan HURUF KAPITAL atau tulis ulang kalimat dengan nada tegas tanpa perlu bold.
-4. Untuk daftar poin, gunakan tanda strip/minus: - (bukan *)
-5. Setiap nomor pasal ditulis dalam Heading 2: ## PASAL 1 - JUDUL PASAL
-6. Setiap paragraf di dalam pasal ditulis sebagai teks biasa, BUKAN sebagai item list.
+1. JANGAN PERNAH menuliskan tag HTML seperti <p>, <p align="center">, <center>, atau tag HTML lainnya di dalam draf. Gunakan Markdown murni saja. Semua pengetengahan dan perataan teks akan ditangani secara otomatis oleh parser frontend kami.
+2. GUNAKAN HEADING MARKDOWN SAJA: # untuk judul utama dokumen (ditulis di awal baris baru), ## untuk judul pasal (e.g., ## PASAL 1 - RUANG LINGKUP PEKERJAAN), ### untuk sub-bagian.
+3. Gunakan ** (double asterisk) untuk menebalkan kata atau teks penting di dalam kalimat, seperti nama Pihak (**PIHAK PERTAMA**, **PIHAK KEDUA**), nomor pasal/ayat di awal kalimat, atau istilah penting hukum lainnya.
+4. Untuk daftar poin, gunakan tanda strip/minus: - (bukan *).
+5. Setiap paragraf di dalam pasal ditulis sebagai teks biasa, BUKAN sebagai item list.
+6. JANGAN menggunakan bullet points (- atau *) untuk rincian identitas para pihak (seperti nama, jabatan, alamat). Tuliskan rincian identitas tersebut sebagai baris paragraf biasa dengan format titik dua (:) sejajar tanpa simbol poin atau angka di depannya.
+7. JANGAN PERNAH membuat area tanda tangan, kolom tanda tangan, tabel tanda tangan, atau teks tanda tangan di akhir dokumen. Sistem kami akan menambahkan area tanda tangan secara otomatis di bagian bawah dokumen.
 
 ATURAN KONTEN SPK:
 1. Gunakan format dan bahasa hukum formal Indonesia yang sah.
@@ -279,7 +280,7 @@ export function getAnalyzeModel() {
  */
 export function getGenerateModel() {
   return genAI.getGenerativeModel({
-    model: "gemini-1.5-flash",
+    model: "gemini-2.5-flash",
     systemInstruction: GENERATE_SYSTEM_INSTRUCTION,
     generationConfig: generateGenerationConfig,
   });

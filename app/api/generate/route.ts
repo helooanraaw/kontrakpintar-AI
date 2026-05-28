@@ -57,10 +57,13 @@ export async function POST(request: NextRequest) {
     const prompt = `Buatkan draf Surat Perjanjian Kerja (SPK) yang formal, seimbang, dan melindungi UMKM (Pihak Kedua). Gunakan data berikut:
 
 ---ATURAN FORMAT KRITIS (WAJIB DIIKUTI)---
-- DILARANG KERAS menggunakan karakter ** (double asterisk) atau * (single asterisk) di mana pun di dalam teks.
-- Gunakan # untuk judul dokumen, ## untuk judul pasal, ### untuk sub-bagian.
+- JANGAN PERNAH menyisipkan tag HTML seperti <p>, <p align="center">, <center>, atau tag HTML lainnya ke dalam dokumen draf. Gunakan Markdown murni saja.
+- Gunakan # untuk judul dokumen, ## untuk judul pasal (e.g., ## PASAL 1 - RUANG LINGKUP PEKERJAAN), ### untuk sub-bagian.
+- Gunakan ** (double asterisk) untuk menebalkan teks penting di dalam paragraf (misalnya nama Pihak: **PIHAK PERTAMA**, **PIHAK KEDUA**, nomor pasal, atau judul poin).
 - Gunakan tanda - (minus/strip) untuk daftar poin, BUKAN tanda *.
-- Teks paragraf ditulis biasa tanpa asterisk apa pun. Jika ingin menekankan kata, gunakan HURUF KAPITAL.
+- Teks paragraf ditulis biasa dan manfaatkan ** untuk bold istilah/point hukum utama agar dokumen rapi dan mudah dibaca.
+- JANGAN menggunakan bullet points (- atau *) untuk menuliskan detail identitas pihak (Nama, Domisili, Jabatan, dll.). Tulis identitas pihak sebagai paragraf biasa dengan titik dua (:) sejajar tanpa simbol poin atau angka di depannya.
+- JANGAN PERNAH membuat area tanda tangan, kolom tanda tangan, tabel tanda tangan, atau kolom nama penandatangan di bagian akhir dokumen SPK. Sistem kami secara otomatis menambahkan area tanda tangan di bagian paling bawah.
 
 ---DATA PERJANJIAN---
 PIHAK PERTAMA (Pemberi Tugas/Klien):
@@ -92,11 +95,8 @@ ${body.instruksiKhusus ? `INSTRUKSI TAMBAHAN KHUSUS PENGGUNA (Prioritaskan keten
     const result = await model.generateContent(prompt);
     let draftMarkdown = extractResponseText(result);
 
-    // Post-processing: bersihkan karakter ** dan * yang tersesat dari output AI
-    draftMarkdown = draftMarkdown
-      .replace(/\*\*(.*?)\*\*/g, "$1")  // Ubah **bold** jadi teks biasa
-      .replace(/\*(.*?)\*/g, "$1")       // Ubah *italic* jadi teks biasa
-      .replace(/\*{1,2}/g, "");          // Hapus sisa * yang tersendiri
+    // Post-processing: normalisasi jika ada asterisks berlebih, tapi pertahankan **
+    draftMarkdown = draftMarkdown.replace(/\*{3,}/g, "**");
 
     /* \u2500\u2500 3. Kembalikan draf SPK \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
     return Response.json(

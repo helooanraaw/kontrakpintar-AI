@@ -21,6 +21,7 @@ import {
 
 export default function Navbar() {
   const pathname = usePathname();
+  if (pathname === "/login") return null;
   const searchParams = useSearchParams();
   const activeTab = searchParams.get("tab") || "overview";
 
@@ -69,7 +70,7 @@ export default function Navbar() {
   ];
 
   const dashboardLinks = [
-    { tab: "overview", label: "Ikhtisar", icon: LayoutDashboard },
+    { tab: "overview", label: "Dashboard", icon: LayoutDashboard },
     { tab: "analyzer", label: "Scan Kontrak", icon: ShieldCheck },
     { tab: "wizard", label: "Buat SPK", icon: FileText },
     { tab: "glossary", label: "Kamus Hukum", icon: BookOpen },
@@ -100,10 +101,6 @@ export default function Navbar() {
           href={isLoggedIn ? "/dashboard?tab=overview" : "/"}
           className="flex items-center gap-2.5 group select-none"
         >
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center transition-transform group-hover:scale-105 duration-200"
-            style={{ background: "linear-gradient(135deg, #00262b 0%, #0b363b 100%)", boxShadow: "0 2px 8px rgba(0,38,43,0.25)" }}>
-            <Scale className="w-4 h-4 text-[#abffae]" />
-          </div>
           <span className="text-[15px] font-bold text-[#00262b] tracking-tight">
             Kontrak<span className="text-[#006af2]">Pintar</span>
             <span className="text-[10px] font-bold text-[#354d51] ml-1 align-top mt-0.5 inline-block">AI</span>
@@ -161,23 +158,6 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           {/* Desktop: CTA + Auth */}
           <div className="hidden md:flex items-center gap-2.5">
-            {!isLoggedIn && (
-              <Link
-                href="/login?redirect=/dashboard?tab=analyzer"
-                className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-lg transition-all duration-200 hover:-translate-y-0.5"
-                style={{
-                  background: "linear-gradient(135deg, #00262b 0%, #0b363b 100%)",
-                  color: "white",
-                  boxShadow: "0 2px 8px rgba(0,38,43,0.2)",
-                }}
-                onMouseEnter={e => e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,38,43,0.3)"}
-                onMouseLeave={e => e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,38,43,0.2)"}
-              >
-                <Shield className="w-3.5 h-3.5" />
-                Mulai Gratis
-                <ArrowRight className="w-3 h-3" />
-              </Link>
-            )}
             <AuthButton />
           </div>
 
@@ -236,17 +216,7 @@ export default function Navbar() {
             </div>
 
             <div className="pt-4 border-t flex flex-col gap-3" style={{ borderColor: "rgba(0,38,43,0.08)" }}>
-              {!isLoggedIn && (
-                <Link
-                  href="/login?redirect=/dashboard?tab=analyzer"
-                  className="flex items-center justify-center gap-2 text-sm font-bold py-3 rounded-xl text-white"
-                  style={{ background: "linear-gradient(135deg, #00262b 0%, #0b363b 100%)" }}
-                >
-                  <Shield className="w-4 h-4" />
-                  Mulai Gratis Sekarang
-                </Link>
-              )}
-              <div className="flex justify-center">
+              <div className="flex justify-center w-full">
                 <AuthButton />
               </div>
             </div>

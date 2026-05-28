@@ -323,7 +323,7 @@ function LoginPageContent() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-61px)] w-full flex items-center justify-center bg-canvas px-4 py-12">
+    <div className="min-h-screen w-full flex items-center justify-center bg-canvas px-4 py-12">
       <div className="w-full max-w-[380px] animate-fade-up">
         
         {/* Banner Simulasi Verifikasi (Penting untuk Demo Juri) */}
@@ -345,23 +345,22 @@ function LoginPageContent() {
           </div>
         )}
 
-        {/* Brand / Logo */}
-        <div className="flex flex-col items-center mb-8 text-center select-none">
-          <Link href="/" className="flex items-center gap-2 mb-2">
-            <div className="w-8 h-8 rounded-lg bg-[#00262b] flex items-center justify-center border border-white/10 shadow-sm">
-              <Scale className="w-4.5 h-4.5 text-[#abffae]" />
-            </div>
-            <span className="text-base font-bold text-[#00262b] tracking-tight">
-              Kontrak<span className="text-[#006af2]">Pintar</span>
-            </span>
-          </Link>
-          <p className="text-[10.5px] text-slate-grille">
-            Masuk ke Workspace Hukum UMKM Anda
-          </p>
-        </div>
-
         {/* Minimalist Login Card */}
         <Card className="p-6 border border-slate-200 bg-white shadow-xs rounded-xl">
+          {/* Brand / Logo */}
+          <div className="flex flex-col items-center mb-6 text-center select-none">
+            <Link href="/" className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-lg bg-[#00262b] flex items-center justify-center border border-white/10 shadow-sm">
+                <Scale className="w-4.5 h-4.5 text-[#abffae]" />
+              </div>
+              <span className="text-base font-bold text-[#00262b] tracking-tight">
+                Kontrak<span className="text-[#006af2]">Pintar</span>
+              </span>
+            </Link>
+            <p className="text-[10.5px] text-slate-grille">
+              Masuk ke Workspace Hukum UMKM Anda
+            </p>
+          </div>
           {/* Simple Tab Switcher */}
           <div className="flex border-b border-slate-100 mb-6 text-center text-xs">
             <button
@@ -533,7 +532,7 @@ function LoginPageContent() {
 
 function LoginFallback() {
   return (
-    <div className="min-h-[calc(100vh-61px)] w-full flex items-center justify-center bg-canvas">
+    <div className="min-h-screen w-full flex items-center justify-center bg-canvas">
       <Loader2 className="w-6 h-6 text-slate-grille animate-spin" />
     </div>
   );

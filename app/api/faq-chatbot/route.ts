@@ -76,60 +76,79 @@ export async function POST(request: NextRequest) {
 
     const genAI = new GoogleGenerativeAI(apiKey.trim());
     
-    // Gunakan model gemini-2.5-flash yang didukung penuh oleh API key
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      systemInstruction: CHATBOT_SYSTEM_INSTRUCTION,
-      generationConfig: {
-        temperature: 0.2, // Sangat rendah untuk respon faktual dan mencegah halusinasi
-        topP: 0.8,
-        maxOutputTokens: 800,
-      },
-    });
+    const modelChain = [
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite",
+      "gemini-2.5-flash-lite",
+      "gemini-2.5-flash"
+    ];
 
-    // Jalankan chat
-    const chat = model.startChat({
-      history: chatHistory.slice(0, -1).map((msg: any) => ({
-        role: msg.role === "user" ? "user" : "model",
-        parts: [{ text: msg.content }],
-      })),
-    });
-
-    const lastMessage = chatHistory[chatHistory.length - 1];
-    
-    let retries = 2;
     let lastError: any = null;
+    const lastMessage = chatHistory[chatHistory.length - 1];
 
-    while (retries > 0) {
-      try {
-        const result = await chat.sendMessage(lastMessage.content);
-        const responseText = result.response.text();
-        
-        return Response.json(
-          { reply: responseText || "Maaf, saya tidak dapat memahami respons tersebut." },
-          { status: 200 }
-        );
-      } catch (err: any) {
-        lastError = err;
-        const errMsg = err.message || "";
-        console.warn(`[FAQ Chatbot] Gagal menghubungi Gemini (Sisa percobaan: ${retries - 1}):`, errMsg);
+    for (const modelName of modelChain) {
+      let retries = 2; // Coba 2 kali jika ada error transient pada model ini
+      while (retries > 0) {
+        try {
+          console.log(`[FAQ Chatbot] Mencoba model: ${modelName} (Sisa percobaan: ${retries - 1})`);
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            systemInstruction: CHATBOT_SYSTEM_INSTRUCTION,
+            generationConfig: {
+              temperature: 0.2, // Sangat rendah untuk respon faktual dan mencegah halusinasi
+              topP: 0.8,
+              maxOutputTokens: 800,
+            },
+          });
 
-        const isTransient =
-          errMsg.includes("503") ||
-          errMsg.includes("429") ||
-          errMsg.includes("RESOURCE_EXHAUSTED") ||
-          errMsg.includes("Service Unavailable") ||
-          errMsg.includes("Overloaded") ||
-          errMsg.includes("fetch failed") ||
-          errMsg.includes("Unavailable");
+          const chat = model.startChat({
+            history: chatHistory.slice(0, -1).map((msg: any) => ({
+              role: msg.role === "user" ? "user" : "model",
+              parts: [{ text: msg.content }],
+            })),
+          });
 
-        if (!isTransient) {
-          throw err;
-        }
+          const result = await chat.sendMessage(lastMessage.content);
+          const responseText = result.response.text();
+          
+          if (responseText) {
+            return Response.json(
+              { reply: responseText },
+              { status: 200 }
+            );
+          }
+        } catch (err: any) {
+          lastError = err;
+          const errMsg = err.message || "";
+          console.warn(`[FAQ Chatbot] Gagal menggunakan ${modelName}:`, errMsg);
 
-        retries--;
-        if (retries > 0) {
-          await new Promise((resolve) => setTimeout(resolve, 1500));
+          // Jika model tidak ditemukan atau tidak didukung oleh API key, segera coba model berikutnya
+          const isRecoverableModelIssue =
+            errMsg.includes("404") ||
+            errMsg.includes("not found") ||
+            errMsg.includes("not supported");
+
+          if (isRecoverableModelIssue) {
+            break;
+          }
+
+          const isTransient =
+            errMsg.includes("503") ||
+            errMsg.includes("429") ||
+            errMsg.includes("RESOURCE_EXHAUSTED") ||
+            errMsg.includes("Service Unavailable") ||
+            errMsg.includes("Overloaded") ||
+            errMsg.includes("fetch failed") ||
+            errMsg.includes("Unavailable");
+
+          if (!isTransient) {
+            throw err;
+          }
+
+          retries--;
+          if (retries > 0) {
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+          }
         }
       }
     }
@@ -142,7 +161,7 @@ export async function POST(request: NextRequest) {
     
     if (isRateLimit) {
       return Response.json(
-        { error: "Batas kuota harian Gemini API gratis Anda telah habis (Maksimum 20 permintaan/hari untuk model gemini-2.5-flash). Silakan gunakan API Key yang berbeda di file .env.local atau coba lagi setelah kuota Anda di-reset secara otomatis oleh Google." },
+        { error: "Batas kuota harian Gemini API gratis Anda telah habis. Silakan gunakan API Key yang berbeda di file .env.local atau coba lagi setelah beberapa saat." },
         { status: 429 }
       );
     }

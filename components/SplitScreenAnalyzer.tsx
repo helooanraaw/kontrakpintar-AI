@@ -267,15 +267,17 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
     setError(null);
 
     // Filter valid files
-    const validFiles = fileList.filter((file) => {
+    const invalidFiles = fileList.filter((file) => {
       const ext = file.name.split(".").pop()?.toLowerCase();
-      return ["pdf", "docx", "txt", "png", "jpg", "jpeg", "webp"].includes(ext || "");
+      return !["pdf", "docx", "doc", "txt", "png", "jpg", "jpeg", "webp"].includes(ext || "");
     });
 
-    if (validFiles.length === 0) {
-      setError("Format file tidak didukung. Harap unggah .pdf, .docx, .txt, atau gambar (.png, .jpg, .jpeg, .webp).");
+    if (invalidFiles.length > 0 || fileList.length === 0) {
+      setError("Format file tidak didukung. Harap unggah .pdf, .docx, .doc, .txt, atau gambar (.png, .jpg, .jpeg, .webp).");
       return;
     }
+
+    const validFiles = fileList;
 
     // Pisahkan berkas gambar dan berkas dokumen
     const imageFiles = validFiles.filter((file) => {
@@ -285,7 +287,7 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
 
     const docFiles = validFiles.filter((file) => {
       const ext = file.name.split(".").pop()?.toLowerCase();
-      return ["pdf", "docx", "txt"].includes(ext || "");
+      return ["pdf", "docx", "doc", "txt"].includes(ext || "");
     });
 
     const newDocsCount = (imageFiles.length > 0 ? 1 : 0) + docFiles.length;
@@ -865,7 +867,13 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
   // Aman-O-Meter SVG Calculation
   const radius = 48;
   const circumference = 2 * Math.PI * radius;
-  const score = activeDoc?.result ? activeDoc.result.skorKeamanan : 0;
+  const scoreRaw = activeDoc?.result ? (activeDoc.result.skorKeamanan ?? (activeDoc.result as any).score) : undefined;
+  const scoreVal = typeof scoreRaw === "number" && !isNaN(scoreRaw)
+    ? scoreRaw 
+    : (activeDoc?.result 
+        ? Math.max(0, Math.min(100, Math.round((1 - (activeDoc.result.jumlahBahaya || 0) / (activeDoc.result.totalPasal || 1)) * 100)))
+        : 0);
+  const score = isNaN(scoreVal) ? 0 : scoreVal;
   const strokeDashoffset = circumference - (score / 100) * circumference;
 
   const getSeverityColor = (s: string) => {
@@ -883,20 +891,20 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
   const hasResult = activeDoc && activeDoc.result;
 
   return (
-    <div className="w-full flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto items-stretch">
+    <div className="w-full flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto items-stretch h-full min-h-0">
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
         type="file"
         multiple
-        accept=".pdf,.docx,.txt,.png,.jpg,.jpeg,.webp"
+        accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg,.webp"
         className="hidden"
         onChange={handleFileChange}
       />
 
       {/* 1. BILAH SISI DAFTAR DOKUMEN (WORKSPACE SIDEBAR) - Collapsible */}
       {showSidebar && (
-        <div className="w-full lg:w-56 bg-white rounded-xl border border-border-light p-4 flex flex-col gap-3 shrink-0 self-start shadow-xs animate-fade-in">
+        <div className="w-full lg:w-56 bg-white rounded-xl border border-border-light p-4 flex flex-col gap-3 shrink-0 lg:h-full shadow-xs animate-fade-in">
           <div className="flex items-center justify-between border-b border-border-light pb-2.5">
             <span className="text-xs font-bold text-midnight-ink uppercase tracking-wide">
               Berkas ({docs.length}/50)
@@ -910,7 +918,7 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
             </button>
           </div>
 
-          <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[220px] lg:max-h-[460px] custom-scrollbar pr-1">
+          <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[220px] lg:flex-1 custom-scrollbar pr-1">
             {docs.map((doc) => {
               const isActive = doc.id === activeDocId;
               return (
@@ -965,12 +973,12 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
       )}
 
       {/* 2. AREA EDITOR (Lebar penuh jika tidak ada hasil analisis) */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 lg:h-full min-h-0 overflow-hidden">
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className={`flex-1 flex flex-col bg-white rounded-xl border overflow-hidden transition-colors ${
+          className={`flex-1 flex flex-col bg-white rounded-xl border overflow-hidden transition-colors min-h-0 ${
             isDragging
               ? "border-electric-blue shadow-focus-blue"
               : "border-border-light shadow-sm"
@@ -1022,7 +1030,7 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
           </div>
 
           {/* Editor Body */}
-          <div className="flex-1 flex relative overflow-hidden min-h-[350px]">
+          <div className="flex-1 flex relative overflow-hidden min-h-0">
             {activeDoc?.loading && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/90 z-20 p-6 gap-3 text-center">
                 <Loader2 className="w-8 h-8 text-electric-blue animate-spin" />
@@ -1049,7 +1057,7 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
                   Seret & Lepas Berkas atau Gambar di Sini
                 </p>
                 <p className="text-xs text-slate-grille max-w-[280px] leading-relaxed">
-                  Format PDF, Word (.docx), Teks (.txt), atau Gambar (.png, .jpg, .jpeg, .webp) untuk dipindai OCR.
+                  Format PDF, Word (.docx, .doc), Teks (.txt), atau Gambar (.png, .jpg, .jpeg, .webp) untuk dipindai OCR.
                 </p>
               </div>
             )}
@@ -1091,8 +1099,8 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
           </div>
         </div>
 
-        {/* Action Button */}
-        <div className="mt-3 flex flex-col gap-2">
+        {/* Action Button — always visible at the bottom, never scrolled away */}
+        <div className="shrink-0 mt-3 flex flex-col gap-2">
           {activeDoc?.error && (
             <div className="flex items-start gap-2 p-3 bg-warm-mist border border-amber-pop/20 rounded-lg text-xs text-amber-pop animate-fade-up">
               <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
@@ -1119,239 +1127,215 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
 
       {/* 3. AREA KANAN: PANEL HASIL AI (Hanya tampil ketika ada hasil analisis) */}
       {hasResult && activeDoc?.result && (
-        <div className="w-full lg:w-[460px] xl:w-[500px] flex flex-col overflow-y-auto custom-scrollbar shrink-0 animate-fade-in pb-10">
-          <div className="space-y-4">
-            {/* 1. Aman-O-Meter */}
-            <div className="card-elevated rounded-xl">
-              <div className="flex items-center gap-5">
-                <div className="relative w-24 h-24 shrink-0">
-                  <svg className="w-full h-full -rotate-90" viewBox="0 0 110 110">
-                    <defs>
-                      <linearGradient id="score-grad" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#006af2" />
-                        <stop offset="100%" stopColor="#00c6ff" />
-                      </linearGradient>
-                    </defs>
-                    <circle
-                      cx="55"
-                      cy="55"
-                      r={radius}
-                      strokeWidth="7"
-                      stroke="var(--color-border-light)"
-                      fill="transparent"
-                    />
-                    <circle
-                      cx="55"
-                      cy="55"
-                      r={radius}
-                      strokeWidth="7"
-                      strokeDasharray={circumference}
-                      strokeDashoffset={strokeDashoffset}
-                      strokeLinecap="round"
-                      stroke="url(#score-grad)"
-                      fill="transparent"
-                      className="transition-all duration-1000 ease-out"
-                    />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-2xl font-extrabold text-electric-blue tracking-tighter leading-none">
-                      {score}%
-                    </span>
-                    <span className="text-[9px] text-slate-grille font-semibold uppercase tracking-wider mt-0.5">
-                      Aman
-                    </span>
-                  </div>
-                </div>
+        <div className="w-full lg:w-[500px] xl:w-[540px] flex flex-col gap-4 overflow-y-auto custom-scrollbar shrink-0 animate-fade-in pb-6 pr-1.5 lg:h-full">
 
-                <div className="flex-1 space-y-2">
-                  <h4 className="text-sm font-bold text-midnight-ink">
-                    Skor Keamanan Kontrak
-                  </h4>
+          {/* Panel Header */}
+          <div className="flex items-center justify-between bg-white rounded-xl border border-border-light px-4 py-3 shadow-xs shrink-0">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-electric-blue animate-pulse" />
+              <span className="text-xs font-bold text-midnight-ink uppercase tracking-wide">Hasil Analisis AI</span>
+            </div>
+            <button
+              onClick={handlePrintAnalysisReport}
+              className="inline-flex items-center gap-1.5 text-[10px] font-bold text-electric-blue border border-electric-blue/30 hover:bg-electric-blue/5 px-3 py-1.5 rounded-lg transition-all uppercase tracking-wider cursor-pointer"
+            >
+              <Printer className="w-3 h-3" />
+              Cetak Laporan
+            </button>
+          </div>
+
+          {/* 1. Aman-O-Meter — Hero Card */}
+          <div
+            className={`rounded-xl border border-border-light overflow-hidden shadow-xs p-4 shrink-0 ${
+              score >= 80
+                ? "bg-gradient-to-br from-[#f0fff4] to-[#dcfce7] border-green-200"
+                : score >= 50
+                ? "bg-gradient-to-br from-[#fffbeb] to-[#fef3c7] border-amber-200"
+                : "bg-gradient-to-br from-[#fff8f5] to-[#ffece3] border-red-200"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                {/* Big Percent Circle */}
+                <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-xs border border-border-light shrink-0">
+                  <span className="text-xl font-black text-electric-blue tracking-tighter">
+                    {score}%
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-[10px] font-bold text-slate-grille uppercase tracking-wider mb-1">Keamanan Kontrak</h4>
                   <div
-                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
                       score >= 80
-                        ? "bg-pale-mint text-[#1d6b2a] border-spring-leaf/40"
+                        ? "bg-[#1d6b2a]/10 text-[#1d6b2a]"
                         : score >= 50
-                        ? "bg-amber-50 text-amber-800 border-amber-200"
-                        : "bg-warm-mist text-amber-pop border-amber-pop/25"
+                        ? "bg-amber-800/10 text-amber-800"
+                        : "bg-red-800/10 text-red-700"
                     }`}
                   >
                     {score >= 80 ? (
-                      <>
-                        <CheckCircle className="w-3 h-3" /> Kontrak Aman & Adil
-                      </>
+                      <><CheckCircle className="w-3 h-3" /> Aman &amp; Adil</>
                     ) : score >= 50 ? (
-                      <>
-                        <Info className="w-3 h-3" /> Butuh Negosiasi Ulang
-                      </>
+                      <><Info className="w-3 h-3" /> Butuh Negosiasi</>
                     ) : (
-                      <>
-                        <AlertTriangle className="w-3 h-3" /> Draf Berbahaya
-                      </>
+                      <><AlertTriangle className="w-3 h-3" /> Draf Rawan</>
                     )}
                   </div>
-                  <p className="text-xs text-slate-grille leading-relaxed">
-                    Terdeteksi {activeDoc.result.jumlahBahaya} klausul bermasalah.
-                    Pastikan negosiasi ulang sebelum tanda tangan.
-                  </p>
-                  <button
-                    onClick={handlePrintAnalysisReport}
-                    className="inline-flex items-center gap-1.5 text-[10px] font-bold text-electric-blue border border-electric-blue/35 hover:bg-electric-blue/5 px-2.5 py-1 rounded-lg mt-2 transition-all uppercase tracking-wider"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    Cetak Laporan Red Flags
-                  </button>
                 </div>
               </div>
-            </div>
 
-            {/* 2. Ringkasan */}
-            <div className="card rounded-xl">
-              <p className="label-cap mb-2.5">Ringkasan Analisis</p>
-              <p className="text-xs text-slate-grille leading-relaxed">
-                <GlossaryWrapper text={activeDoc.result.ringkasan} />
-              </p>
+              <div className="text-right shrink-0">
+                <p className="text-[9px] text-slate-grille font-bold uppercase tracking-wider mb-0.5">Red Flags</p>
+                <p className="text-xs font-black text-midnight-ink uppercase">{activeDoc.result.jumlahBahaya} Temuan</p>
+              </div>
             </div>
+          </div>
 
-            {/* 3. Red Flags & Visual Diff */}
-            {activeDoc.result.redFlags && activeDoc.result.redFlags.length > 0 && (
-              <div className="space-y-2.5">
-                <p className="label-cap text-amber-pop">
+          {/* 2. Ringkasan Analisis */}
+          <div className="bg-white rounded-xl border border-border-light p-5 shadow-xs shrink-0">
+            <p className="text-[10px] font-bold text-slate-grille uppercase tracking-widest mb-3">Ringkasan Analisis</p>
+            <div className="text-[13px] text-slate-grille leading-relaxed">
+              <GlossaryWrapper text={activeDoc.result.ringkasan} />
+            </div>
+          </div>
+
+          {/* 3. Red Flags */}
+          {activeDoc.result.redFlags && activeDoc.result.redFlags.length > 0 && (
+            <div className="flex flex-col gap-3 shrink-0">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-pop" />
+                <p className="text-[10px] font-bold text-amber-pop uppercase tracking-widest">
                   {activeDoc.result.jumlahBahaya} Red Flags Ditemukan
                 </p>
-                {activeDoc.result.redFlags.map((flag, idx) => {
-                  const color = getSeverityColor(flag.tingkatKeparahan);
-                  const isDiffOpen = !!showDiff[idx];
+              </div>
+              {activeDoc.result.redFlags.map((flag, idx) => {
+                const color = getSeverityColor(flag.tingkatKeparahan);
+                const isDiffOpen = !!showDiff[idx];
 
-                  return (
-                    <div
-                      key={idx}
-                      className="bg-white rounded-xl border border-border-light overflow-hidden shadow-xs"
-                      style={{ borderLeftWidth: "3px", borderLeftColor: color.border }}
-                    >
-                      {/* Red Flag Header */}
-                      <div className="px-4 py-2.5 border-b border-border-light flex items-center justify-between bg-fog-gray/20">
-                        <span className="text-xs font-bold text-midnight-ink bg-fog-gray px-2 py-0.5 rounded border border-border-light">
-                          {flag.pasalRef || `Klausul ${idx + 1}`}
-                        </span>
-                        <span
-                          className={`text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full border ${getSeverityBadge(
-                            flag.tingkatKeparahan
-                          )}`}
-                        >
-                          {flag.tingkatKeparahan}
-                        </span>
+                return (
+                  <div
+                    key={idx}
+                    className="bg-white rounded-xl border border-border-light overflow-hidden shadow-xs"
+                    style={{ borderLeftWidth: "4px", borderLeftColor: color.border }}
+                  >
+                    {/* Red Flag Header */}
+                    <div className="px-5 py-3 border-b border-border-light flex items-center justify-between bg-fog-gray/30">
+                      <span className="text-xs font-bold text-midnight-ink bg-white px-2.5 py-1 rounded-md border border-border-light">
+                        {flag.pasalRef || `Klausul ${idx + 1}`}
+                      </span>
+                      <span
+                        className={`text-[9px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full border ${getSeverityBadge(
+                          flag.tingkatKeparahan
+                        )}`}
+                      >
+                        {flag.tingkatKeparahan}
+                      </span>
+                    </div>
+
+                    {/* Content Area */}
+                    <div className="px-5 py-4 space-y-4">
+                      {/* Why Dangerous */}
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-grille uppercase tracking-widest mb-2">Analisis Potensi Risiko</p>
+                        <div className="text-[13px] text-slate-grille leading-relaxed">
+                          <GlossaryWrapper text={flag.alasanBahaya} />
+                        </div>
                       </div>
 
-                      {/* Content Area */}
-                      <div className="px-4 py-3 space-y-3">
-                        {/* Why Dangerous */}
-                        <div>
-                          <p className="label-cap text-[9px] mb-1">Analisis Potensi Risiko</p>
-                          <p className="text-xs text-slate-grille leading-relaxed">
-                            <GlossaryWrapper text={flag.alasanBahaya} />
-                          </p>
-                        </div>
-
-                        {/* Interactive Visual Diff Viewer */}
-                        {isDiffOpen ? (
-                          <div className="space-y-2 animate-fade-up">
-                            <p className="label-cap text-[9px]">Perbandingan Visual (Diff)</p>
-                            <div className="rounded-lg overflow-hidden border border-border-light text-[11px] font-mono leading-relaxed divide-y divide-border-light">
-                              {/* Deleted / Original */}
-                              <div className="bg-red-50 text-red-700 p-2.5 relative">
-                                <span className="absolute top-2 right-2 text-[9px] font-bold text-red-800 bg-red-200 px-1 rounded uppercase tracking-wider">
-                                  Pasal Asli
-                                </span>
-                                <span className="line-through block pr-12">
-                                  {flag.kutipanAsli}
-                                </span>
-                              </div>
-                              {/* Added / Revised */}
-                              <div className="bg-green-50 text-green-800 p-2.5 relative">
-                                <span className="absolute top-2 right-2 text-[9px] font-bold text-green-800 bg-green-200 px-1 rounded uppercase tracking-wider">
-                                  Usulan Revisi
-                                </span>
-                                <span className="font-semibold block pr-16">
-                                  {flag.usulanRevisi}
-                                </span>
-                              </div>
+                      {/* Interactive Visual Diff Viewer */}
+                      {isDiffOpen ? (
+                        <div className="space-y-2.5 animate-fade-up">
+                          <p className="text-[9px] font-bold text-slate-grille uppercase tracking-widest">Perbandingan Visual (Diff)</p>
+                          <div className="rounded-xl overflow-hidden border border-border-light text-[11px] font-mono leading-relaxed divide-y divide-border-light">
+                            <div className="bg-red-50 text-red-700 p-3.5 relative">
+                              <span className="absolute top-2.5 right-2.5 text-[9px] font-bold text-red-800 bg-red-200 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                Pasal Asli
+                              </span>
+                              <span className="line-through block pr-16 leading-relaxed">{flag.kutipanAsli}</span>
+                            </div>
+                            <div className="bg-green-50 text-green-800 p-3.5 relative">
+                              <span className="absolute top-2.5 right-2.5 text-[9px] font-bold text-green-800 bg-green-200 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                Usulan Revisi
+                              </span>
+                              <span className="font-semibold block pr-20 leading-relaxed">{flag.usulanRevisi}</span>
                             </div>
                           </div>
-                        ) : (
-                          <div className="space-y-2.5">
-                            <div>
-                              <p className="label-cap text-[9px] mb-1">Kutipan Asli Kontrak</p>
-                              <blockquote
-                                className="text-xs font-mono text-slate-grille leading-relaxed p-2 rounded-lg border-l-2 border-border-medium"
-                                style={{ background: color.bg }}
-                              >
-                                &ldquo;{flag.kutipanAsli}&rdquo;
-                              </blockquote>
-                            </div>
-                            <div>
-                              <p className="label-cap text-[9px] text-[#195e24] mb-1">Usulan Revisi</p>
-                              <p className="text-xs text-green-900 font-semibold bg-pale-mint/45 border border-spring-leaf/25 rounded-lg p-2.5">
-                                {flag.usulanRevisi}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Card Toolbar */}
-                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-light">
-                          <button
-                            onClick={() => toggleDiff(idx)}
-                            className={`btn-outline text-xs py-1.5 px-3 flex items-center gap-1.5 transition active:scale-95 cursor-pointer ${
-                              isDiffOpen ? "bg-[#00262b] text-white border-[#00262b] hover:bg-[#0b363b]" : ""
-                            }`}
-                          >
-                            <GitCompare className="w-3.5 h-3.5" />
-                            {isDiffOpen ? "Tutup Perbandingan" : "Bandingkan Teks"}
-                          </button>
-                          <button
-                            onClick={() => handleCopyRevision(flag.usulanRevisi, idx)}
-                            className="btn-outline text-xs py-1.5 px-3 flex items-center gap-1.5 active:scale-95 cursor-pointer"
-                          >
-                            {copiedIndex === idx ? (
-                              <>
-                                <Check className="w-3 h-3 text-green-600" /> Tersalin
-                              </>
-                            ) : (
-                              <>
-                                <Copy className="w-3.5 h-3.5" /> Salin Usulan
-                              </>
-                            )}
-                          </button>
                         </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div>
+                            <p className="text-[9px] font-bold text-slate-grille uppercase tracking-widest mb-2">Kutipan Asli Kontrak</p>
+                            <blockquote
+                              className="text-[11px] font-mono text-slate-grille leading-relaxed px-3.5 py-3 rounded-lg border-l-2 border-border-medium"
+                              style={{ background: color.bg }}
+                            >
+                              &ldquo;{flag.kutipanAsli}&rdquo;
+                            </blockquote>
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-bold text-[#195e24] uppercase tracking-widest mb-2">Usulan Revisi AI</p>
+                            <p className="text-[12px] text-green-900 font-semibold bg-pale-mint/40 border border-spring-leaf/25 rounded-xl px-4 py-3 leading-relaxed">
+                              {flag.usulanRevisi}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Card Toolbar */}
+                      <div className="flex items-center justify-end gap-2 pt-3 border-t border-border-light">
+                        <button
+                          onClick={() => toggleDiff(idx)}
+                          className={`btn-outline text-[11px] py-2 px-3.5 flex items-center gap-1.5 transition active:scale-95 cursor-pointer ${
+                            isDiffOpen ? "bg-[#00262b] text-white border-[#00262b] hover:bg-[#0b363b]" : ""
+                          }`}
+                        >
+                          <GitCompare className="w-3.5 h-3.5" />
+                          {isDiffOpen ? "Tutup Perbandingan" : "Bandingkan Teks"}
+                        </button>
+                        <button
+                          onClick={() => handleCopyRevision(flag.usulanRevisi, idx)}
+                          className="btn-outline text-[11px] py-2 px-3.5 flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                        >
+                          {copiedIndex === idx ? (
+                            <><Check className="w-3 h-3 text-green-600" /> Tersalin</>
+                          ) : (
+                            <><Copy className="w-3.5 h-3.5" /> Salin Usulan</>
+                          )}
+                        </button>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
-            {/* 4. Hal Positif */}
-            {activeDoc.result.catatanPositif && activeDoc.result.catatanPositif.length > 0 && (
-              <div className="card rounded-xl bg-pale-mint/30 border-spring-leaf/30">
-                <p className="label-cap text-[#1d6b2a] mb-2.5">Pasal Adil & Seimbang</p>
-                <ul className="space-y-1.5">
-                  {activeDoc.result.catatanPositif.map((pos, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-xs text-green-950 leading-relaxed">
-                      <CheckCircle className="w-3.5 h-3.5 text-[#1d6b2a] shrink-0 mt-0.5" />
-                      <span>{pos}</span>
-                    </li>
-                  ))}
-                </ul>
+          {/* 4. Hal Positif */}
+          {activeDoc.result.catatanPositif && activeDoc.result.catatanPositif.length > 0 && (
+            <div className="bg-pale-mint/25 border border-spring-leaf/30 rounded-xl p-5 shrink-0">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle className="w-3.5 h-3.5 text-[#1d6b2a]" />
+                <p className="text-[10px] font-bold text-[#1d6b2a] uppercase tracking-widest">Pasal Adil &amp; Seimbang</p>
               </div>
-            )}
+              <ul className="space-y-2.5">
+                {activeDoc.result.catatanPositif.map((pos, idx) => (
+                  <li key={idx} className="flex items-start gap-2.5 text-[13px] text-green-950 leading-relaxed">
+                    <CheckCircle className="w-4 h-4 text-[#1d6b2a] shrink-0 mt-0.5" />
+                    <span>{pos}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-            {/* 5. Rekomendasi Umum */}
-            <div className="card rounded-xl border-l-[3px] border-l-electric-blue bg-electric-blue/3">
-              <p className="label-cap text-electric-blue mb-2">Rekomendasi Utama</p>
-              <p className="text-xs text-slate-grille leading-relaxed">
-                <GlossaryWrapper text={activeDoc.result.rekomendasiUmum} />
-              </p>
+          {/* 5. Rekomendasi Utama */}
+          <div className="bg-white border border-border-light border-l-[4px] border-l-electric-blue rounded-xl p-5 shadow-xs shrink-0">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-3.5 h-3.5 text-electric-blue" />
+              <p className="text-[10px] font-bold text-electric-blue uppercase tracking-widest">Rekomendasi Utama AI</p>
+            </div>
+            <div className="text-[13px] text-slate-grille leading-relaxed">
+              <GlossaryWrapper text={activeDoc.result.rekomendasiUmum} />
             </div>
           </div>
         </div>

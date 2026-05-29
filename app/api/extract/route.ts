@@ -18,7 +18,12 @@ async function extractTextFromImageWithFallback(
   buffer: Buffer,
   mimeType: string
 ): Promise<string> {
-  const models = ["gemini-2.5-flash"];
+  const models = [
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash"
+  ];
   let lastError: any = null;
 
   const imagePart = {
@@ -31,7 +36,7 @@ async function extractTextFromImageWithFallback(
   const prompt = "Ekstrak seluruh teks dokumen hukum dalam gambar ini secara lengkap, terstruktur, dan verbatim (tanpa diubah/dikurangi). Jangan lewatkan satupun kata atau angka. JANGAN berikan penjelasan, pendahuluan, kesimpulan, atau komentar apa pun. Cukup kembalikan teks mentah aslinya saja.";
 
   for (const modelName of models) {
-    let retries = 3; // Coba 3 kali untuk model stabil ini
+    let retries = 3; // Coba 3 kali untuk model stabil ini jika ada error transient
     while (retries > 0) {
       try {
         console.log(`[OCR] Mencoba mengekstrak teks dengan model: ${modelName} (Sisa percobaan: ${retries - 1})`);
@@ -45,6 +50,16 @@ async function extractTextFromImageWithFallback(
         lastError = err;
         const errMsg = err.message || "";
         console.warn(`[OCR] Gagal menggunakan ${modelName}:`, errMsg);
+
+        // Jika model tidak ditemukan atau tidak didukung oleh API key, segera coba model berikutnya
+        const isRecoverableModelIssue =
+          errMsg.includes("404") ||
+          errMsg.includes("not found") ||
+          errMsg.includes("not supported");
+
+        if (isRecoverableModelIssue) {
+          break;
+        }
 
         const isTransient = 
           errMsg.includes("503") || 
@@ -130,6 +145,36 @@ export async function POST(request: NextRequest) {
         );
       }
     } else if (
+      mimeType === "application/msword" ||
+      fileName.endsWith(".doc")
+    ) {
+      // Ekstraksi berkas .doc (HTML buatan internal atau biner doc)
+      const textContent = buffer.toString("utf-8");
+      if (textContent.includes("<html") || textContent.includes("<body")) {
+        // Bersihkan tag HTML
+        extractedText = textContent
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+          .replace(/<xml[^>]*>[\s\S]*?<\/xml>/gi, "")
+          .replace(/<(?:.|\n)*?>/gm, "")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&quot;/g, '"')
+          .replace(/&lt;/g, "<")
+          .replace(/&gt;/g, ">")
+          .replace(/\r\n/g, "\n")
+          .replace(/\n\s*\n+/g, "\n\n")
+          .trim();
+      } else {
+        // Biner .doc lama tidak didukung secara penuh
+        return Response.json(
+          {
+            error: "Format berkas Word format lama (.doc biner) tidak didukung. Harap simpan sebagai .docx (Word Modern) atau gunakan PDF/Teks.",
+            code: "BINARY_DOC_NOT_SUPPORTED",
+          },
+          { status: 422 }
+        );
+      }
+    } else if (
       mimeType === "text/plain" ||
       fileName.endsWith(".txt") ||
       fileName.endsWith(".law")
@@ -166,7 +211,7 @@ export async function POST(request: NextRequest) {
     } else {
       return Response.json(
         {
-          error: "Format berkas tidak didukung. Harap unggah berkas .pdf, .docx, .txt, atau gambar (.png, .jpg, .jpeg, .webp).",
+          error: "Format berkas tidak didukung. Harap unggah berkas .pdf, .docx, .doc, .txt, atau gambar (.png, .jpg, .jpeg, .webp).",
           code: "UNSUPPORTED_FORMAT",
         },
         { status: 415 }

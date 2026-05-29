@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -24,15 +24,17 @@ import {
   Sparkles,
   Copy,
   Check,
-  Info,
-  RotateCcw,
   AlertTriangle,
+  BadgeCheck,
+  Gavel,
+  FileWarning,
+  BrainCircuit,
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { checkCanGenerate, incrementUsageCount, checkIsLoggedIn } from "@/lib/limits";
 import { GlossaryWrapper } from "@/components/GlossaryWrapper";
-import { parseMarkdownBlocks, convertMarkdownFormatting } from "@/lib/markdownParser";
+import { parseMarkdownBlocks, convertMarkdownFormatting, shouldIndentParagraph } from "@/lib/markdownParser";
 
 interface FAQItem {
   question: string;
@@ -165,8 +167,17 @@ Setiap hari keterlambatan penyelesaian proyek oleh Pihak Kedua akan dikenakan de
 Pasal 5: HAK KEKAYAAN INTELEKTUAL
 Hak Kekayaan Intelektual atas hasil kerja dialihkan sepenuhnya secara otomatis kepada Pihak Pertama setelah draf awal diserahkan, terlepas dari status pelunasan pembayaran.`;
 
-// ── Component scroll reveal ──
-function RevealOnScroll({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+// ── Component scroll reveal with direction support ──
+type RevealDirection = "up" | "left" | "right" | "scale" | "blur";
+function RevealOnScroll({
+  children,
+  delay = 0,
+  direction = "up",
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  direction?: RevealDirection;
+}) {
   const [isVisible, setIsVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -178,25 +189,47 @@ function RevealOnScroll({ children, delay = 0 }: { children: React.ReactNode; de
           observer.disconnect();
         }
       },
-      { threshold: 0.1, rootMargin: "0px 0px -40px 0px" }
+      { threshold: 0.08, rootMargin: "0px 0px -50px 0px" }
     );
-    if (ref.current) {
-      observer.observe(ref.current);
-    }
+    if (ref.current) observer.observe(ref.current);
     return () => observer.disconnect();
   }, []);
+
+  const hiddenStyles: Record<RevealDirection, string> = {
+    up:    "opacity-0 translate-y-10",
+    left:  "opacity-0 -translate-x-12",
+    right: "opacity-0 translate-x-12",
+    scale: "opacity-0 scale-90",
+    blur:  "opacity-0 blur-sm translate-y-4",
+  };
+  const visibleStyle = "opacity-100 translate-y-0 translate-x-0 scale-100 blur-0";
 
   return (
     <div
       ref={ref}
       className={`transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+        isVisible ? visibleStyle : hiddenStyles[direction]
       }`}
       style={{ transitionDelay: `${delay}ms` }}
     >
       {children}
     </div>
   );
+}
+
+// ── Hook: chart SVG line animation on scroll ──
+function useChartVisible() {
+  const [visible, setVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold: 0.3 }
+    );
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, []);
+  return { ref, visible };
 }
 
 // ── Animated counter hook ──
@@ -225,57 +258,75 @@ const parseMarkdownToHtml = (md: string): string => {
     switch (block.type) {
       case "h1":
         htmlBlocks.push(
-          `<h1 style="text-align:center;font-size:14pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:0;margin-bottom:18pt;text-transform:uppercase;line-height:1.5;">${convertMarkdownFormatting(block.content || "")}</h1>`
+          `<h1 style="text-align:center;font-size:14pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:0;margin-bottom:18pt;text-transform:uppercase;line-height:150%;mso-line-height-rule:exactly;">${convertMarkdownFormatting(block.content || "")}</h1>`
         );
         break;
       case "h2":
         if (block.isPasal) {
           htmlBlocks.push(
-            `<h2 style="text-align:center;font-size:12pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:24pt;margin-bottom:12pt;text-transform:uppercase;line-height:1.5;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.pasalNum || "")}<br/>${convertMarkdownFormatting(block.pasalTitle || "")}</h2>`
+            `<h2 style="text-align:center;font-size:12pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:24pt;margin-bottom:12pt;text-transform:uppercase;line-height:150%;mso-line-height-rule:exactly;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.pasalNum || "")}<br/>${convertMarkdownFormatting(block.pasalTitle || "")}</h2>`
           );
         } else {
           htmlBlocks.push(
-            `<h2 style="text-align:center;font-size:12pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:24pt;margin-bottom:12pt;text-transform:uppercase;line-height:1.5;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.content || "")}</h2>`
+            `<h2 style="text-align:center;font-size:12pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:24pt;margin-bottom:12pt;text-transform:uppercase;line-height:150%;mso-line-height-rule:exactly;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.content || "")}</h2>`
           );
         }
         break;
       case "h3":
         htmlBlocks.push(
-          `<h3 style="font-size:11pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:12pt;margin-bottom:6pt;line-height:1.5;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.content || "")}</h3>`
+          `<h3 style="font-size:11pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:12pt;margin-bottom:6pt;line-height:150%;mso-line-height-rule:exactly;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.content || "")}</h3>`
         );
         break;
       case "center-bold":
         htmlBlocks.push(
-          `<p style="text-align:center;font-size:11pt;font-family:'Times New Roman',serif;font-weight:bold;line-height:1.5;margin-top:-6pt;margin-bottom:18pt;color:#000;">${convertMarkdownFormatting(block.content || "")}</p>`
+          `<p style="text-align:center;font-size:11pt;font-family:'Times New Roman',serif;font-weight:bold;line-height:150%;mso-line-height-rule:exactly;margin-top:-6pt;margin-bottom:18pt;color:#000;">${convertMarkdownFormatting(block.content || "")}</p>`
         );
         break;
-      case "paragraph":
-        htmlBlocks.push(
-          `<p style="font-size:11pt;font-family:'Times New Roman',serif;text-align:justify;line-height:1.5;margin:0 0 8pt 0;text-indent:1.25cm;color:#000;">${convertMarkdownFormatting(block.content || "")}</p>`
-        );
+      case "paragraph": {
+        const content = block.content || "";
+        const trimmed = content.trim();
+        const match = trimmed.match(/^([\w\s]{2,30})\s*:\s*(.*)$/);
+        const isHeader = /^\*\*PIHAK\s+[A-Z\s]+\*\*$/i.test(trimmed) || /^\*\*PARA\s+PIHAK\*\*$/i.test(trimmed);
+        
+        if (isHeader) {
+          const style = "font-size:11pt;font-family:'Times New Roman',serif;line-height:150%;mso-line-height-rule:exactly;color:#000;margin:12pt 0 4pt 0;text-indent:0;font-weight:bold;";
+          htmlBlocks.push(`<p style="${style}">${convertMarkdownFormatting(content)}</p>`);
+        } else if (match) {
+          const key = match[1].trim();
+          const val = match[2].trim();
+          htmlBlocks.push(`
+            <table style="width:100%;border:none;margin:0 0 3pt 0;border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;">
+              <tr style="border:none;">
+                <td style="width:120pt;font-family:'Times New Roman',serif;font-size:11pt;line-height:150%;mso-line-height-rule:exactly;color:#000;vertical-align:top;border:none;padding:0;">${convertMarkdownFormatting(key)}</td>
+                <td style="width:15pt;font-family:'Times New Roman',serif;font-size:11pt;line-height:150%;mso-line-height-rule:exactly;color:#000;vertical-align:top;border:none;padding:0;text-align:center;">:</td>
+                <td style="font-family:'Times New Roman',serif;font-size:11pt;line-height:150%;mso-line-height-rule:exactly;color:#000;vertical-align:top;border:none;padding:0;text-align:justify;">${convertMarkdownFormatting(val)}</td>
+              </tr>
+            </table>
+          `);
+        } else {
+          const needsIndent = shouldIndentParagraph(content);
+          const style = `font-size:11pt;font-family:'Times New Roman',serif;text-align:justify;line-height:150%;mso-line-height-rule:exactly;color:#000;margin:0 0 8pt 0;${needsIndent ? "text-indent:1.25cm;" : "text-indent:0;"}`;
+          htmlBlocks.push(`<p style="${style}">${convertMarkdownFormatting(content)}</p>`);
+        }
         break;
+      }
       case "list":
         if (block.items) {
           const listHtml = block.items.map((item) => {
+            const depth = item.depth || 0;
+            const marginLeft = depth === 1 ? "2.75cm" : depth === 2 ? "3.5cm" : "2.0cm";
+            
             if (item.type === "bullet") {
               return `
-                <table class="list-table" style="width:100%;border-collapse:collapse;border:none;margin:0 0 6pt;padding:0;page-break-inside:avoid;break-inside:avoid;">
-                  <tr style="border:none;">
-                    <td style="width:1.25cm;padding:0;border:none;"></td>
-                    <td style="width:0.5cm;vertical-align:top;text-align:left;padding:0;font-family:'Times New Roman',serif;font-size:11pt;line-height:1.5;color:#000;border:none;">•</td>
-                    <td style="vertical-align:top;text-align:justify;padding:0;font-family:'Times New Roman',serif;font-size:11pt;line-height:1.5;color:#000;border:none;">${convertMarkdownFormatting(item.content)}</td>
-                  </tr>
-                </table>
+                <p style="font-size:11pt;font-family:'Times New Roman',serif;text-align:justify;line-height:150%;mso-line-height-rule:exactly;margin:0 0 6pt ${marginLeft};text-indent:-0.75cm;color:#000;page-break-inside:avoid;break-inside:avoid;">
+                  •&nbsp;&nbsp;&nbsp;${convertMarkdownFormatting(item.content)}
+                </p>
               `;
             } else {
               return `
-                <table class="list-table" style="width:100%;border-collapse:collapse;border:none;margin:0 0 8pt;padding:0;page-break-inside:avoid;break-inside:avoid;">
-                  <tr style="border:none;">
-                    <td style="width:1.25cm;padding:0;border:none;"></td>
-                    <td style="width:0.75cm;vertical-align:top;text-align:left;padding:0;font-family:'Times New Roman',serif;font-size:11pt;line-height:1.5;font-weight:bold;color:#000;border:none;">${item.prefix}</td>
-                    <td style="vertical-align:top;text-align:justify;padding:0;font-family:'Times New Roman',serif;font-size:11pt;line-height:1.5;color:#000;border:none;">${convertMarkdownFormatting(item.content)}</td>
-                  </tr>
-                </table>
+                <p style="font-size:11pt;font-family:'Times New Roman',serif;text-align:justify;line-height:150%;mso-line-height-rule:exactly;margin:0 0 8pt ${marginLeft};text-indent:-0.75cm;color:#000;page-break-inside:avoid;break-inside:avoid;">
+                  <strong>${item.prefix}</strong>&nbsp;&nbsp;&nbsp;${convertMarkdownFormatting(item.content)}
+                </p>
               `;
             }
           }).join("");
@@ -287,6 +338,135 @@ const parseMarkdownToHtml = (md: string): string => {
   
   return htmlBlocks.join("");
 };
+
+// ── Animated Line Chart Component ──
+function AnimatedLineChart() {
+  const { ref, visible } = useChartVisible();
+  return (
+    <RevealOnScroll>
+      <div ref={ref} className="bg-white rounded-2xl border border-border-light p-7 space-y-5 shadow-sm hover:shadow-md transition-shadow duration-300">
+        <div className="flex items-start justify-between">
+          <div>
+            <h4 className="text-sm font-extrabold text-midnight-ink uppercase tracking-wide">Tren Akurasi Pemindaian</h4>
+            <p className="text-xs text-slate-grille mt-0.5">Mendeteksi klausul denda, HAKI, dan wanprestasi.</p>
+          </div>
+          <span className="text-xs font-bold text-electric-blue bg-[#f0f6ff] px-2.5 py-1 rounded-full border border-blue-100 shrink-0">99.4% Teruji</span>
+        </div>
+        <div className="relative h-48 bg-fog-gray/30 rounded-xl border border-border-light/50 overflow-hidden pt-4 px-3">
+          <svg className="w-full h-[110px]" viewBox="0 0 300 90" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="acc-grad2" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#006af2" stopOpacity="0.22" />
+                <stop offset="100%" stopColor="#006af2" stopOpacity="0" />
+              </linearGradient>
+              <linearGradient id="line-grad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor="#006af2" stopOpacity="0.3" />
+                <stop offset="100%" stopColor="#006af2" stopOpacity="1" />
+              </linearGradient>
+            </defs>
+            {/* Grid lines */}
+            {[18, 45, 72].map(y => (
+              <line key={y} x1="0" y1={y} x2="300" y2={y} stroke="#e4e8eb" strokeWidth="0.5" strokeDasharray="4 4" />
+            ))}
+            {/* Area fill */}
+            <polygon
+              points="10,75 70,68 135,50 200,32 265,15 290,5 290,85 10,85"
+              fill="url(#acc-grad2)"
+              style={{ opacity: visible ? 1 : 0, transition: "opacity 0.8s 0.3s" }}
+            />
+            {/* Animated line */}
+            <polyline
+              points="10,75 70,68 135,50 200,32 265,15 290,5"
+              fill="none"
+              stroke="url(#line-grad)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray="400"
+              strokeDashoffset={visible ? "0" : "400"}
+              style={{ transition: "stroke-dashoffset 1.4s cubic-bezier(0.22,1,0.36,1) 0.1s" }}
+            />
+            {/* Dots */}
+            {([[10,75],[70,68],[135,50],[200,32],[265,15],[290,5]] as [number,number][]).map(([cx, cy], idx) => (
+              <circle
+                key={idx}
+                cx={cx} cy={cy} r="4"
+                fill="white" stroke="#006af2" strokeWidth="2"
+                style={{
+                  opacity: visible ? 1 : 0,
+                  transition: `opacity 0.3s ${0.4 + idx * 0.12}s`,
+                }}
+              />
+            ))}
+          </svg>
+          <div className="absolute bottom-2.5 left-0 right-0 px-4 flex justify-between text-[8px] font-bold text-slate-grille font-mono">
+            {[["Jan","91%"],["Feb","92%"],["Mar","95%"],["Apr","97%"],["Mei","99.4%"]].map(([m,v], i) => (
+              <span key={i} className="flex flex-col items-center gap-0.5">
+                <span>{m}</span>
+                <span className={i === 4 ? "text-electric-blue font-extrabold" : "text-slate-grille/70"}>{v}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </RevealOnScroll>
+  );
+}
+
+// ── Animated Bar Chart Component ──
+function AnimatedBarChart() {
+  const { ref, visible } = useChartVisible();
+  const bars = [
+    { m: "Jan", v: "2.5K", h: 24 },
+    { m: "Feb", v: "5.8K", h: 46 },
+    { m: "Mar", v: "9.4K", h: 73 },
+    { m: "Apr", v: "12.1K", h: 95 },
+    { m: "Mei", v: "15K+", h: 120 },
+  ];
+  return (
+    <RevealOnScroll delay={150}>
+      <div ref={ref} className="bg-white rounded-2xl border border-border-light p-7 space-y-5 shadow-sm hover:shadow-md transition-shadow duration-300">
+        <div className="flex items-start justify-between">
+          <div>
+            <h4 className="text-sm font-extrabold text-midnight-ink uppercase tracking-wide">Kontrak UMKM Terlindungi</h4>
+            <p className="text-xs text-slate-grille mt-0.5">Pertumbuhan akumulatif dokumen yang diamankan.</p>
+          </div>
+          <span className="text-xs font-bold text-[#1d6b2a] bg-[#eafde8] px-2.5 py-1 rounded-full border border-spring-leaf/30 shrink-0">15K+ Aktif</span>
+        </div>
+        <div className="flex items-end justify-around h-48 pb-6 pt-8 bg-fog-gray/30 rounded-xl border border-border-light/50 px-4 gap-3">
+          {bars.map((bar, i) => (
+            <div key={i} className="flex flex-col items-center gap-1.5 flex-1 group">
+              <span
+                className={`text-[9px] font-bold transition-all duration-300 ${i === 4 ? "text-electric-blue" : "text-slate-grille opacity-0 group-hover:opacity-100"}`}
+                style={{ opacity: visible && i === 4 ? 1 : undefined }}
+              >
+                {bar.v}
+              </span>
+              <div
+                className="w-full rounded-t-lg overflow-hidden"
+                style={{ height: `${bar.h}px` }}
+              >
+                <div
+                  className="w-full h-full"
+                  style={{
+                    background: i === 4
+                      ? "linear-gradient(180deg, #006af2 0%, #0044bb 100%)"
+                      : "rgba(0,38,43,0.10)",
+                    boxShadow: i === 4 ? "0 4px 16px rgba(0,106,242,0.30)" : "none",
+                    transform: visible ? "scaleY(1)" : "scaleY(0)",
+                    transformOrigin: "bottom",
+                    transition: `transform 0.7s cubic-bezier(0.34,1.56,0.64,1) ${i * 0.1}s`,
+                  }}
+                />
+              </div>
+              <span className={`text-[9px] font-bold ${i === 4 ? "text-midnight-ink" : "text-slate-grille"}`}>{bar.m}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </RevealOnScroll>
+  );
+}
 
 export default function Home() {
   const router = useRouter();
@@ -568,13 +748,15 @@ div.Section1 {
 body {
   font-family: 'Times New Roman', serif;
   font-size: 11pt;
-  line-height: 1.5;
+  line-height: 150%;
+  mso-line-height-rule: exactly;
 }
 p {
   margin: 0in 0in 8pt;
   font-family: 'Times New Roman', serif;
   font-size: 11pt;
-  line-height: 1.5;
+  line-height: 150%;
+  mso-line-height-rule: exactly;
   text-align: justify;
 }
 h1 {
@@ -585,7 +767,8 @@ h1 {
   text-transform: uppercase;
   margin-top: 12pt;
   margin-bottom: 12pt;
-  line-height: 1.5;
+  line-height: 150%;
+  mso-line-height-rule: exactly;
 }
 h2 {
   font-family: 'Times New Roman', serif;
@@ -595,7 +778,8 @@ h2 {
   text-transform: uppercase;
   margin-top: 24pt;
   margin-bottom: 12pt;
-  line-height: 1.5;
+  line-height: 150%;
+  mso-line-height-rule: exactly;
   page-break-after: avoid;
 }
 h3 {
@@ -604,7 +788,8 @@ h3 {
   font-weight: bold;
   margin-top: 12pt;
   margin-bottom: 6pt;
-  line-height: 1.5;
+  line-height: 150%;
+  mso-line-height-rule: exactly;
   page-break-after: avoid;
 }
 </style>
@@ -750,25 +935,61 @@ h3 {
     <div className="min-h-screen bg-canvas font-sans antialiased text-midnight-ink overflow-x-hidden">
 
       {/* ─────────────────── HERO ─────────────────── */}
-      <section id="hero" className="relative overflow-hidden pt-24 pb-28">
-        {/* Multi-layer background */}
-        <div className="absolute inset-0 bg-grid-pattern opacity-50 pointer-events-none" />
-        
-        {/* Animated glow orbs with parallax scroll */}
+      <section id="hero" className="relative overflow-hidden pt-12 pb-32">
+        {/* Grid background */}
+        <div className="absolute inset-0 bg-grid-pattern opacity-60 pointer-events-none" />
+
+        {/* Aurora orbs – animate drift */}
         <div
-          className="absolute -top-32 left-1/2 -translate-x-1/2 w-[800px] h-[500px] pointer-events-none animate-glow-pulse transition-transform duration-100"
+          className="absolute -top-40 left-1/3 w-[700px] h-[600px] pointer-events-none animate-aurora"
           style={{
-            background: "radial-gradient(ellipse at center, rgba(0, 106, 242, 0.09) 0%, transparent 65%)",
-            transform: `translate(-50%, ${scrollY * 0.12}px)`
+            background: "radial-gradient(ellipse at center, rgba(0,106,242,0.11) 0%, transparent 60%)",
+            transform: `translate(-30%, ${scrollY * 0.1}px)`,
           }}
         />
         <div
-          className="absolute top-40 -right-20 w-[500px] h-[400px] pointer-events-none animate-glow-pulse animation-delay-700 transition-transform duration-100"
+          className="absolute top-20 -right-32 w-[500px] h-[500px] pointer-events-none animate-aurora animation-delay-2000"
           style={{
-            background: "radial-gradient(ellipse at center, rgba(171, 255, 174, 0.12) 0%, transparent 65%)",
-            transform: `translateY(${scrollY * -0.08}px)`
+            background: "radial-gradient(ellipse at center, rgba(171,255,174,0.14) 0%, transparent 60%)",
+            transform: `translateY(${scrollY * -0.07}px)`,
           }}
         />
+        <div
+          className="absolute bottom-0 left-0 w-[400px] h-[400px] pointer-events-none animate-aurora animation-delay-1000"
+          style={{
+            background: "radial-gradient(ellipse at center, rgba(139,57,17,0.06) 0%, transparent 60%)",
+          }}
+        />
+
+        {/* Futuristic Tech Mesh Grid / Jaring-Jaring (Balanced density pattern) */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-[1]">
+          <svg className="w-full h-full text-oceanic-deep/20" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              {/* Fade out gradients toward edges */}
+              <radialGradient id="mesh-fade" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stopColor="white" stopOpacity="1" />
+                <stop offset="60%" stopColor="white" stopOpacity="0.8" />
+                <stop offset="100%" stopColor="white" stopOpacity="0" />
+              </radialGradient>
+              <mask id="mesh-mask">
+                <rect width="100%" height="100%" fill="url(#mesh-fade)" />
+              </mask>
+              {/* Balanced mesh pattern definition (60px x 60px cells) */}
+              <pattern id="fine-mesh-pattern" width="60" height="60" patternUnits="userSpaceOnUse">
+                {/* Horizontal & vertical lines */}
+                <line x1="0" y1="0" x2="60" y2="0" stroke="currentColor" strokeWidth="0.5" />
+                <line x1="0" y1="0" x2="0" y2="60" stroke="currentColor" strokeWidth="0.5" />
+                {/* Diagonal lines to make it a triangular mesh */}
+                <line x1="0" y1="0" x2="60" y2="60" stroke="currentColor" strokeWidth="0.3" strokeDasharray="1 3" opacity="0.6" />
+                {/* Subtle intersection dots */}
+                <circle cx="0" cy="0" r="1.25" fill="currentColor" opacity="0.8" />
+                <circle cx="30" cy="30" r="0.75" fill="var(--color-electric-blue)" opacity="0.4" />
+              </pattern>
+            </defs>
+            {/* Render pattern inside mask */}
+            <rect width="100%" height="100%" fill="url(#fine-mesh-pattern)" mask="url(#mesh-mask)" />
+          </svg>
+        </div>
 
         <div className="section-container relative z-10">
           <div className="max-w-3xl mx-auto text-center space-y-8">
@@ -776,7 +997,7 @@ h3 {
             {/* Badge */}
             <div className="animate-fade-up inline-flex items-center gap-2.5 px-4 py-2 bg-white rounded-full border border-border-light shadow-sm text-xs font-semibold text-midnight-ink">
               <span className="flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-electric-blue" />
+                <BrainCircuit className="w-3.5 h-3.5 text-electric-blue" />
                 Didukung Google Gemini AI
               </span>
               <span className="w-px h-3.5 bg-border-light" />
@@ -787,13 +1008,13 @@ h3 {
             </div>
 
             {/* Headline */}
-            <div className="animate-fade-up animation-delay-100 space-y-3">
-              <h1 className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-[1.05] text-midnight-ink">
-                Lindungi Bisnis{" "}
+            <div className="animate-fade-up animation-delay-100 space-y-4">
+              <h1 className="text-5xl sm:text-6xl lg:text-[4.5rem] font-extrabold tracking-tighter leading-[1.03] text-midnight-ink">
+                Lindungi Bisnis Anda{" "}
                 <br className="hidden sm:block" />
                 <span
                   style={{
-                    background: "linear-gradient(135deg, #006af2 0%, #0b363b 100%)",
+                    background: "linear-gradient(135deg, #006af2 0%, #004db3 50%, #0b363b 100%)",
                     WebkitBackgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     backgroundClip: "text",
@@ -802,8 +1023,8 @@ h3 {
                   dari Jerat Kontrak
                 </span>
               </h1>
-              <p className="text-base sm:text-lg text-slate-grille max-w-2xl mx-auto leading-relaxed">
-                KontrakPintar AI mendeteksi klausul berbahaya dalam draf kontrak kerja sama dan membantu UMKM membuat Surat Perjanjian Kerja yang adil — dalam hitungan menit.
+              <p className="text-base sm:text-lg text-slate-grille max-w-xl mx-auto leading-relaxed">
+                KontrakPintar AI mendeteksi pasal berbahaya dalam kontrak dan membantu UMKM membuat Surat Perjanjian Kerja yang adil — dalam hitungan menit, tanpa biaya pengacara.
               </p>
             </div>
 
@@ -811,7 +1032,7 @@ h3 {
             <div className="animate-fade-up animation-delay-200 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href={isLoggedIn ? "/dashboard?tab=analyzer" : "/login?redirect=/dashboard?tab=analyzer"}
-                className="btn-primary px-7 py-3.5 text-sm font-bold flex items-center gap-2 shadow-sm hover:shadow-md transition-shadow"
+                className="btn-primary px-7 py-3.5 text-sm font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
               >
                 <Shield className="w-4 h-4 text-spring-leaf" />
                 Scan Kontrak Sekarang
@@ -819,9 +1040,9 @@ h3 {
               </Link>
               <Link
                 href={isLoggedIn ? "/dashboard?tab=wizard" : "/login?redirect=/dashboard?tab=wizard"}
-                className="btn-outline px-7 py-3.5 text-sm font-semibold flex items-center gap-2 shadow-sm hover:shadow-md transition-shadow"
+                className="btn-outline px-7 py-3.5 text-sm font-semibold flex items-center gap-2 hover:-translate-y-0.5 transition-all"
               >
-                Buat Draf SPK Baru
+                Buat Draf SPK Gratis
                 <FileText className="w-4 h-4 text-electric-blue" />
               </Link>
             </div>
@@ -832,6 +1053,7 @@ h3 {
                 { icon: Lock, label: "Enkripsi SSL" },
                 { icon: CheckCircle2, label: "Uji Coba Gratis" },
                 { icon: Zap, label: "Hasil dalam 30 Detik" },
+                { icon: BadgeCheck, label: "Sesuai KUHPerdata" },
               ].map((t, i) => (
                 <span key={i} className="flex items-center gap-1.5 font-medium">
                   <t.icon className="w-3.5 h-3.5 text-electric-blue" />
@@ -1177,29 +1399,165 @@ h3 {
               )}
             </div>
 
-            {/* Floating badges */}
-            <div className="relative mt-0">
-              <div className="absolute -top-4 -left-6">
-                <div className="bg-white border border-border-light rounded-xl shadow-sm px-4 py-2.5 flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-[#eafde8] flex items-center justify-center">
+            {/* Floating badges — static positioning without float animation */}
+            <div className="relative mt-0 hidden md:block">
+              {/* Left badge */}
+              <div className="absolute -top-6 -left-8">
+                <div className="floating-card px-4 py-2.5 flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[#eafde8] flex items-center justify-center shrink-0">
                     <CheckCircle2 className="w-4 h-4 text-[#1d6b2a]" />
                   </div>
                   <div>
-                    <p className="text-[10px] font-bold text-midnight-ink">SPK Dibuat</p>
-                    <p className="text-[9px] text-slate-grille">2 menit 34 detik</p>
+                    <p className="text-[10px] font-bold text-midnight-ink">SPK Berhasil Dibuat</p>
+                    <p className="text-[9px] text-slate-grille">dalam 2 menit 34 detik ✨</p>
                   </div>
                 </div>
               </div>
-              <div className="absolute -top-4 -right-6">
-                <div className="bg-midnight-ink border border-white/10 rounded-xl shadow-sm px-4 py-2.5 flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4 text-spring-leaf" />
+              {/* Right badge */}
+              <div className="absolute -top-6 -right-8">
+                <div className="floating-card px-4 py-2.5 flex items-center gap-2.5" style={{ background: "rgba(0,38,43,0.95)" }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(171,255,174,0.15)" }}>
+                    <TrendingUp className="w-4 h-4 text-spring-leaf" />
+                  </div>
                   <div>
                     <p className="text-[10px] font-bold text-white">99.4% Akurasi</p>
-                    <p className="text-[9px] text-white/50">Red Flag Detection</p>
+                    <p className="text-[9px] text-white/50">Deteksi Red Flag</p>
                   </div>
+                </div>
+              </div>
+              {/* Bottom badge */}
+              <div className="absolute -bottom-4 left-1/2 -translate-x-1/2">
+                <div className="floating-card px-4 py-2 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse-dot" />
+                  <p className="text-[10px] font-bold text-midnight-ink">2 Red Flags Terdeteksi</p>
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─────────────────── MISSION STATEMENT ─────────────────── */}
+      <section className="py-24 bg-white border-t border-border-light overflow-hidden relative bg-diagonal-stripes">
+        {/* Decorative ghost shapes */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full opacity-[0.04]" style={{ background: "radial-gradient(circle, #006af2 0%, transparent 70%)" }} />
+          <div className="absolute bottom-0 -left-24 w-72 h-72 rounded-full opacity-[0.04]" style={{ background: "radial-gradient(circle, #abffae 0%, transparent 70%)" }} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full opacity-[0.025] border border-midnight-ink" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full opacity-[0.015] border border-midnight-ink" />
+        </div>
+        <div className="section-container relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+
+            {/* Left: Text */}
+            <RevealOnScroll direction="left">
+              <div className="space-y-6">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider"
+                  style={{ background: "rgba(139,57,17,0.08)", color: "#8b3911", border: "1px solid rgba(139,57,17,0.15)" }}>
+                  <FileWarning className="w-3 h-3" />
+                  Masalah Nyata UMKM Indonesia
+                </div>
+                <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tighter text-midnight-ink leading-tight">
+                  Ribuan UMKM Terjebak
+                  <br />
+                  <span className="text-gradient-blue">Kontrak Tidak Adil</span>
+                </h2>
+                <p className="text-sm text-slate-grille leading-relaxed">
+                  Banyak pelaku UMKM dan freelancer Indonesia menandatangani kontrak tanpa benar-benar memahami isinya. Akibatnya, mereka terjebak dalam pasal denda sepihak, kehilangan hak cipta karya, atau tidak mendapat ganti rugi saat proyek dibatalkan mendadak.
+                </p>
+                <div className="space-y-3">
+                  {[
+                    { icon: FileWarning, text: "Pasal denda keterlambatan sepihak tanpa batas maksimal", color: "#8b3911", bg: "rgba(139,57,17,0.08)" },
+                    { icon: Gavel, text: "Pengalihan hak cipta sebelum pembayaran lunas", color: "#8b3911", bg: "rgba(139,57,17,0.08)" },
+                    { icon: Shield, text: "Pembatalan proyek sepihak tanpa kompensasi", color: "#8b3911", bg: "rgba(139,57,17,0.08)" },
+                  ].map((item, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5" style={{ background: item.bg }}>
+                        <item.icon className="w-4 h-4" style={{ color: item.color }} />
+                      </div>
+                      <p className="text-sm text-slate-grille leading-relaxed">{item.text}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="pt-2">
+                  <p className="text-xs font-bold text-midnight-ink mb-1">KontrakPintar AI hadir sebagai solusi:</p>
+                  <p className="text-sm text-slate-grille leading-relaxed">
+                    Kami menggunakan kecerdasan buatan Google Gemini untuk memindai, menjelaskan, dan membantu memperbaiki setiap klausul berbahaya dalam kontrak Anda — secara instan, akurat, dan gratis untuk dicoba.
+                  </p>
+                </div>
+              </div>
+            </RevealOnScroll>
+
+            {/* Right: Visual */}
+            <RevealOnScroll direction="right" delay={150}>
+              <div className="relative">
+                {/* Main card */}
+                <div className="bg-white rounded-2xl border border-border-light shadow-lg p-6 space-y-4 relative z-10">
+                  {/* Header */}
+                  <div className="flex items-center gap-3 pb-3 border-b border-border-light">
+                    <div className="w-9 h-9 rounded-xl bg-midnight-ink flex items-center justify-center">
+                      <BrainCircuit className="w-4.5 h-4.5 text-spring-leaf" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-extrabold text-midnight-ink">KontrakPintar AI</p>
+                      <p className="text-[10px] text-slate-grille">Hasil Analisis Instan</p>
+                    </div>
+                    <div className="ml-auto flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse-dot" />
+                      <span className="text-[10px] font-semibold text-green-600">Online</span>
+                    </div>
+                  </div>
+
+                  {/* Safety gauge */}
+                  <div className="flex items-center gap-4 bg-canvas rounded-xl p-3">
+                    <div className="relative w-16 h-16 shrink-0">
+                      <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
+                        <circle cx="18" cy="18" r="14" fill="none" stroke="#e4e8eb" strokeWidth="3" />
+                        <circle cx="18" cy="18" r="14" fill="none" stroke="#8b3911" strokeWidth="3"
+                          strokeDasharray="43 100" strokeLinecap="round" />
+                      </svg>
+                      <span className="absolute inset-0 flex items-center justify-center text-sm font-extrabold text-midnight-ink">43%</span>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-midnight-ink">Skor Keamanan Kontrak</p>
+                      <p className="text-[11px] text-amber-700 font-semibold">⚠ Berisiko Tinggi — Perlu Revisi</p>
+                      <p className="text-[10px] text-slate-grille mt-0.5">Ditemukan 3 pasal kritis dari 7 klausul</p>
+                    </div>
+                  </div>
+
+                  {/* Red flags preview */}
+                  <div className="space-y-2">
+                    {[
+                      { label: "Pasal 4 · Sanksi Keterlambatan", level: "Kritis", color: "#8b3911", bg: "#feefe8" },
+                      { label: "Pasal 6 · Pengalihan HAKI", level: "Kritis", color: "#8b3911", bg: "#feefe8" },
+                      { label: "Pasal 9 · Pembatalan Sepihak", level: "Sedang", color: "#006af2", bg: "#f0f6ff" },
+                    ].map((rf, i) => (
+                      <div key={i} className="flex items-center justify-between p-2.5 rounded-lg border border-border-light bg-white">
+                        <div className="flex items-center gap-2">
+                          <div className="w-1.5 h-6 rounded-full" style={{ background: rf.color }} />
+                          <p className="text-[11px] font-semibold text-midnight-ink">{rf.label}</p>
+                        </div>
+                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ color: rf.color, background: rf.bg }}>
+                          {rf.level}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Suggestion */}
+                  <div className="p-3 rounded-xl border border-spring-leaf/30 bg-[#f0fdf0] text-[11px] text-[#1d6b2a] leading-relaxed">
+                    <span className="font-bold">✓ Usulan Revisi AI:</span> Tambahkan batasan maksimal denda 5% dari nilai kontrak dan kewajiban DP 30% sebelum pekerjaan dimulai.
+                  </div>
+                </div>
+
+                {/* Decorative floating element */}
+                <div className="absolute -top-6 -right-6 w-24 h-24 rounded-2xl opacity-20 pointer-events-none animate-float-slow"
+                  style={{ background: "linear-gradient(135deg, #006af2, #abffae)", transform: "rotate(12deg)" }} />
+                <div className="absolute -bottom-4 -left-4 w-16 h-16 rounded-xl opacity-15 pointer-events-none animate-float animation-delay-700"
+                  style={{ background: "linear-gradient(135deg, #8b3911, #ff8c5a)", transform: "rotate(-8deg)" }} />
+              </div>
+            </RevealOnScroll>
+
           </div>
         </div>
       </section>
@@ -1299,8 +1657,14 @@ h3 {
       </section>
 
       {/* ─────────────────── ADDED SECTION: WHY CHOOSE US ─────────────────── */}
-      <section className="py-24 bg-canvas border-t border-border-light relative overflow-hidden">
-        <div className="section-container space-y-16">
+      <section className="py-24 bg-canvas border-t border-border-light relative overflow-hidden bg-topo">
+        {/* Animated accent glows */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-20 left-1/4 w-80 h-80 animate-particle-a animation-delay-1000" style={{ background: "radial-gradient(circle, rgba(0,106,242,0.05) 0%, transparent 65%)" }} />
+          <div className="absolute bottom-0 right-1/4 w-64 h-64 animate-particle-c animation-delay-2000" style={{ background: "radial-gradient(circle, rgba(171,255,174,0.06) 0%, transparent 65%)" }} />
+          <div className="absolute top-1/2 -right-16 w-48 h-48 animate-particle-b animation-delay-500" style={{ background: "radial-gradient(circle, rgba(0,106,242,0.04) 0%, transparent 65%)" }} />
+        </div>
+        <div className="section-container space-y-16 relative z-10">
           <RevealOnScroll>
             <div className="text-center space-y-4 max-w-2xl mx-auto">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#eafde8] rounded-full border border-spring-leaf/30 text-xs font-bold text-[#1d6b2a] uppercase tracking-widest">
@@ -1412,7 +1776,7 @@ h3 {
         </div>
       </section>
 
-      {/* ─────────────────── DATA & CHARTS ─────────────────── */}
+      {/* ─────────────────── DATA & CHARTS (ANIMATED SVG) ─────────────────── */}
       <section id="datacenter" className="py-28 bg-[#fbfcfe] border-t border-border-light">
         <div className="section-container space-y-16">
           <RevealOnScroll>
@@ -1431,111 +1795,26 @@ h3 {
           </RevealOnScroll>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-            {/* Chart 1: Akurasi */}
-            <RevealOnScroll>
-              <div className="bg-white rounded-2xl border border-border-light p-7 space-y-5 shadow-sm hover:shadow-md transition-shadow duration-300">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h4 className="text-sm font-extrabold text-midnight-ink uppercase tracking-wide">Tren Akurasi Pemindaian</h4>
-                    <p className="text-xs text-slate-grille mt-0.5">Mendeteksi klausul denda, HAKI, dan wanprestasi.</p>
-                  </div>
-                  <span className="text-xs font-bold text-electric-blue bg-[#f0f6ff] px-2.5 py-1 rounded-full border border-blue-100 shrink-0">99.4% Teruji</span>
-                </div>
-                <div className="relative h-44 bg-fog-gray/30 rounded-xl border border-border-light/50 overflow-hidden pt-3 px-2">
-                  <svg className="w-full h-[100px]" viewBox="0 0 300 90" preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="acc-grad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#006af2" stopOpacity="0.2" />
-                        <stop offset="100%" stopColor="#006af2" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    <line x1="0" y1="18" x2="300" y2="18" stroke="#e4e8eb" strokeWidth="0.5" strokeDasharray="3 3" />
-                    <line x1="0" y1="45" x2="300" y2="45" stroke="#e4e8eb" strokeWidth="0.5" strokeDasharray="3 3" />
-                    <line x1="0" y1="72" x2="300" y2="72" stroke="#e4e8eb" strokeWidth="0.5" strokeDasharray="3 3" />
-                    <polygon points="10,75 70,68 135,50 200,32 265,15 290,5 290,85 10,85" fill="url(#acc-grad)" />
-                    <polyline points="10,75 70,68 135,50 200,32 265,15 290,5" fill="none" stroke="#006af2" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                    {[[10,75],[70,68],[135,50],[200,32],[265,15],[290,5]].map(([cx, cy], idx) => (
-                      <circle key={idx} cx={cx} cy={cy} r="4" fill="white" stroke="#006af2" strokeWidth="2" />
-                    ))}
-                  </svg>
-                  <div className="absolute bottom-2 left-0 right-0 px-4 flex justify-between text-[8px] font-bold text-slate-grille font-mono">
-                    {[["Jan","91%"],["Feb","92%"],["Mar","95%"],["Apr","97%"],["Mei","99.4%"]].map(([m,v], i) => (
-                      <span key={i} className="flex flex-col items-center gap-0.5">
-                        <span>{m}</span>
-                        <span className={i === 4 ? "text-electric-blue font-extrabold" : "text-slate-grille/70"}>{v}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </RevealOnScroll>
+            {/* Chart 1: Akurasi — animated line chart */}
+            <AnimatedLineChart />
 
-            {/* Chart 2: Volume UMKM */}
-            <RevealOnScroll delay={150}>
-              <div className="bg-white rounded-2xl border border-border-light p-7 space-y-5 shadow-sm hover:shadow-md transition-shadow duration-300">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h4 className="text-sm font-extrabold text-midnight-ink uppercase tracking-wide">Kontrak UMKM Terlindungi</h4>
-                    <p className="text-xs text-slate-grille mt-0.5">Pertumbuhan akumulatif dokumen yang diamankan.</p>
-                  </div>
-                  <span className="text-xs font-bold text-[#1d6b2a] bg-[#eafde8] px-2.5 py-1 rounded-full border border-spring-leaf/30 shrink-0">15K+ Aktif</span>
-                </div>
-                <div className="flex items-end justify-around h-44 pb-5 pt-8 bg-fog-gray/30 rounded-xl border border-border-light/50 px-4 gap-2">
-                  {[["Jan","2.5K",20],["Feb","5.8K",45],["Mar","9.4K",72],["Apr","12.1K",94],["Mei","15K+",120]].map(([m,v,h], i) => (
-                    <div key={i} className="flex flex-col items-center gap-1.5 flex-1 group">
-                      <span className={`text-[9px] font-bold transition-all ${i === 4 ? "text-electric-blue" : "text-slate-grille opacity-0 group-hover:opacity-100"}`}>{v}</span>
-                      <div
-                        className="w-full rounded-t-md transition-all duration-300"
-                        style={{
-                          height: `${h}px`,
-                          background: i === 4 ? "linear-gradient(180deg, #006af2 0%, #0044bb 100%)" : "rgba(0,38,43,0.12)",
-                          boxShadow: i === 4 ? "0 4px 16px rgba(0,106,242,0.35)" : "none",
-                        }}
-                      />
-                      <span className={`text-[9px] font-bold ${i === 4 ? "text-midnight-ink" : "text-slate-grille"}`}>{m}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </RevealOnScroll>
+            {/* Chart 2: Volume UMKM — animated bar chart */}
+            <AnimatedBarChart />
           </div>
-        </div>
-      </section>
 
-      {/* ─────────────────── TESTIMONIALS ─────────────────── */}
-      <section className="py-28 bg-canvas border-t border-border-light">
-        <div className="section-container space-y-16">
-          <RevealOnScroll>
-            <div className="text-center space-y-4 max-w-xl mx-auto">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-fog-gray rounded-full border border-border-light text-xs font-bold text-slate-grille uppercase tracking-widest">
-                Testimoni Nyata
-              </div>
-              <h2 className="text-4xl font-extrabold tracking-tighter text-midnight-ink">
-                Dipercaya Pelaku UMKM Indonesia
-              </h2>
-            </div>
-          </RevealOnScroll>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            {TESTIMONIALS.map((t, i) => (
-              <RevealOnScroll key={i} delay={i * 100}>
-                <div className="bg-white rounded-2xl border border-border-light p-6 space-y-4 shadow-sm hover:shadow-md transition-shadow duration-300">
-                  {/* Stars */}
-                  <div className="flex gap-0.5">
-                    {Array.from({ length: t.rating }).map((_, si) => (
-                      <Star key={si} className="w-4 h-4 fill-amber-400 text-amber-400" />
-                    ))}
-                  </div>
-                  <p className="text-sm text-slate-grille leading-relaxed italic">"{t.quote}"</p>
-                  <div className="flex items-center gap-3 pt-2 border-t border-border-light">
-                    <div className="w-9 h-9 rounded-full bg-midnight-ink/8 flex items-center justify-center text-xs font-bold text-midnight-ink">
-                      {t.name.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-midnight-ink">{t.name}</p>
-                      <p className="text-[10px] text-slate-grille">{t.role} · {t.city}</p>
-                    </div>
-                  </div>
+          {/* Bonus: Donut stat cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto">
+            {[
+              { label: "Akurasi AI", value: "99.4%", sub: "Uji coba 1.200 dokumen", color: "#006af2" },
+              { label: "UMKM Terlindungi", value: "15K+", sub: "Per Mei 2026", color: "#1d6b2a" },
+              { label: "Jenis Red Flag", value: "6+", sub: "Pasal jebakan terdeteksi", color: "#8b3911" },
+              { label: "Waktu Analisis", value: "<30s", sub: "Per dokumen rata-rata", color: "#006af2" },
+            ].map((stat, i) => (
+              <RevealOnScroll key={i} delay={i * 80} direction="scale">
+                <div className="bg-white rounded-xl border border-border-light p-4 text-center space-y-1 shadow-xs hover:shadow-md transition-all hover:-translate-y-1">
+                  <p className="text-2xl font-extrabold tracking-tighter" style={{ color: stat.color }}>{stat.value}</p>
+                  <p className="text-[11px] font-bold text-midnight-ink">{stat.label}</p>
+                  <p className="text-[9px] text-slate-grille">{stat.sub}</p>
                 </div>
               </RevealOnScroll>
             ))}
@@ -1543,9 +1822,74 @@ h3 {
         </div>
       </section>
 
+      {/* ─────────────────── TESTIMONIALS — INFINITE MARQUEE ─────────────────── */}
+      <section className="py-24 bg-canvas border-t border-border-light overflow-hidden relative bg-mesh-green">
+        {/* Subtle animated glow blobs */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-64 animate-particle-a animation-delay-1500" style={{ background: "radial-gradient(ellipse at top, rgba(171,255,174,0.04) 0%, transparent 70%)" }} />
+          <div className="absolute bottom-0 right-0 w-96 h-96 animate-particle-d animation-delay-2500" style={{ background: "radial-gradient(circle, rgba(0,106,242,0.04) 0%, transparent 65%)" }} />
+        </div>
+        <div className="space-y-12 relative z-10">
+          <RevealOnScroll>
+            <div className="text-center space-y-4 max-w-xl mx-auto px-6">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-fog-gray rounded-full border border-border-light text-xs font-bold text-slate-grille uppercase tracking-widest">
+                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                Testimoni Nyata
+              </div>
+              <h2 className="text-4xl font-extrabold tracking-tighter text-midnight-ink">
+                Dipercaya Pelaku UMKM Indonesia
+              </h2>
+              <p className="text-sm text-slate-grille">
+                Bergabung dengan lebih dari 15.000 pelaku usaha yang sudah menggunakan KontrakPintar AI.
+              </p>
+            </div>
+          </RevealOnScroll>
+
+          {/* Marquee strip */}
+          <div className="relative">
+            {/* Fade edges */}
+            <div className="absolute left-0 top-0 bottom-0 w-20 z-10 pointer-events-none" style={{ background: "linear-gradient(to right, #f5f7f8, transparent)" }} />
+            <div className="absolute right-0 top-0 bottom-0 w-20 z-10 pointer-events-none" style={{ background: "linear-gradient(to left, #f5f7f8, transparent)" }} />
+
+            <div className="overflow-hidden">
+              <div className="marquee-track gap-4 py-1">
+                {/* Duplicate the testimonials list for seamless loop */}
+                {[...TESTIMONIALS, ...TESTIMONIALS, ...TESTIMONIALS].map((t, i) => (
+                  <div
+                    key={i}
+                    className="flex-shrink-0 w-80 bg-white rounded-2xl border border-border-light p-5 space-y-3 shadow-sm"
+                  >
+                    <div className="flex gap-0.5">
+                      {Array.from({ length: t.rating }).map((_, si) => (
+                        <Star key={si} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      ))}
+                    </div>
+                    <p className="text-sm text-slate-grille leading-relaxed">&ldquo;{t.quote}&rdquo;</p>
+                    <div className="flex items-center gap-2.5 pt-2 border-t border-border-light">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-electric-blue/20 to-spring-leaf/20 flex items-center justify-center text-xs font-extrabold text-midnight-ink shrink-0">
+                        {t.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-midnight-ink">{t.name}</p>
+                        <p className="text-[10px] text-slate-grille">{t.role} · {t.city}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ─────────────────── ADDED SECTION: EDUCATIONAL INFO ─────────────────── */}
-      <section className="py-24 bg-white border-t border-border-light">
-        <div className="section-container space-y-16">
+      <section className="py-24 bg-white border-t border-border-light relative overflow-hidden bg-diagonal-stripes">
+        {/* Corner glow accents */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-0 right-0 w-72 h-72 animate-particle-b animation-delay-1000" style={{ background: "radial-gradient(circle at top right, rgba(171,255,174,0.05) 0%, transparent 60%)" }} />
+          <div className="absolute bottom-0 left-0 w-56 h-56 animate-particle-c animation-delay-3000" style={{ background: "radial-gradient(circle at bottom left, rgba(0,106,242,0.04) 0%, transparent 60%)" }} />
+        </div>
+        <div className="section-container space-y-16 relative z-10">
           <RevealOnScroll>
             <div className="text-center space-y-4 max-w-2xl mx-auto">
               <div className="inline-flex items-center gap-2 px-3 py-1 bg-fog-gray rounded-full border border-border-light text-xs font-bold text-slate-grille uppercase tracking-widest">
@@ -1639,6 +1983,11 @@ h3 {
         <div className="absolute inset-0 bg-dot-pattern opacity-[0.06] pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none"
           style={{ background: "radial-gradient(ellipse at top, rgba(171,255,174,0.08) 0%, transparent 70%)" }} />
+        {/* Elegant top & bottom radial glow accents */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute top-[10%] left-[5%] w-80 h-80 opacity-[0.05]" style={{ background: "radial-gradient(circle, #abffae 0%, transparent 70%)" }} />
+          <div className="absolute bottom-[10%] right-[5%] w-96 h-96 opacity-[0.05]" style={{ background: "radial-gradient(circle, #006af2 0%, transparent 70%)" }} />
+        </div>
 
         <div className="section-container relative z-10 text-center space-y-8">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold" style={{ background: "rgba(171,255,174,0.08)", borderColor: "rgba(171,255,174,0.2)", color: "#abffae" }}>

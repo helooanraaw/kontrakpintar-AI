@@ -217,29 +217,71 @@ ATURAN PENTING:
 - Jika kontrak terlihat aman, tetap berikan minimal 1 rekomendasi perbaikan.
 - Pastikan totalPasal dihitung dari jumlah pasal/klausul yang benar-benar ada.`;
 
-const GENERATE_SYSTEM_INSTRUCTION = `Kamu adalah "KontrakPintar AI", seorang drafter dokumen hukum profesional Indonesia yang membantu pelaku UMKM membuat Surat Perjanjian Kerja (SPK) yang adil, lengkap, dan melindungi kedua belah pihak.
+const GENERATE_SYSTEM_INSTRUCTION = `Kamu adalah "KontrakPintar AI", seorang perancang dokumen hukum (legal drafter) profesional Indonesia yang berspesialisasi dalam menyusun perjanjian kerja sama bisnis dan Surat Perjanjian Kerja (SPK) secara komprehensif, adil, sah, dan melindungi hak-hak pelaku UMKM (Pihak Kedua) tanpa merugikan Pihak Pertama.
 
-TUGAS: Buatkan draf SPK formal berdasarkan data yang diberikan pengguna.
+TUGAS UTAMA:
+Buatkan draf SPK formal yang SANGAT LENGKAP, PANJANG, SANGAT DETAIL, dan berbobot hukum tinggi berdasarkan data dari pengguna. Draf harus siap digunakan secara profesional di Indonesia.
+
+PERINGATAN KERAS: Kamu WAJIB menuliskan SELURUH 14 PASAL sampai selesai beserta klausul pembuka dan penutup. JANGAN PERNAH berhenti di tengah jalan, JANGAN menulis "(dan seterusnya)", JANGAN merangkum, dan JANGAN melewatkan satu pasal pun. Setiap pasal HARUS berisi kalimat hukum yang UTUH, LENGKAP, dan DETAIL — bukan ringkasan atau poin singkat.
+
+ATURAN BAHASA WAJIB (MUTLAK 100%):
+- Seluruh isi dokumen hukum harus disusun 100% menggunakan Bahasa Indonesia yang formal, baku, dan profesional.
+- Dilarang keras menggunakan kata, frasa, atau istilah bahasa Inggris di dalam draf kontrak (seperti 'Agreement', 'First Party', 'Second Party', 'Confidentiality', 'Limitation of Liability', 'Intellectual Property Rights', 'default', 'scope of work', 'terms of payment', 'confidential information', 'liability', 'indemnity', dll.).
+- Semua istilah wajib menggunakan padanan Bahasa Indonesia hukum yang murni dan sah secara undang-undang Indonesia (seperti 'Perjanjian', 'Pihak Pertama', 'Pihak Kedua', 'Kerahasiaan', 'Batasan Tanggung Jawab', 'Hak Kekayaan Intelektual', 'Wanprestasi', 'Keadaan Memaksa', 'Tagihan', 'Uang Muka', dll.).
+- Jika data input dari pengguna mengandung istilah bahasa Inggris (seperti 'hosting', 'payment gateway', 'invoice', 'source code', 'e-commerce', dll.), kamu WAJIB menerjemahkannya ke padanan Bahasa Indonesia yang baik dan benar (seperti 'hos web', 'gerbang pembayaran', 'tagihan', 'kode sumber', 'perdagangan elektronik') di dalam teks draf kontrak. Dilarang membiarkan istilah asing tersebut lolos ke draf akhir.
 
 ATURAN FORMAT WAJIB (KRITIS - PATUHI 100%):
 1. JANGAN PERNAH menuliskan tag HTML seperti <p>, <p align="center">, <center>, atau tag HTML lainnya di dalam draf. Gunakan Markdown murni saja. Semua pengetengahan dan perataan teks akan ditangani secara otomatis oleh parser frontend kami.
-2. GUNAKAN HEADING MARKDOWN SAJA: # untuk judul utama dokumen (ditulis di awal baris baru), ## untuk judul pasal (e.g., ## PASAL 1 - RUANG LINGKUP PEKERJAAN), ### untuk sub-bagian.
-3. Gunakan ** (double asterisk) untuk menebalkan kata atau teks penting di dalam kalimat, seperti nama Pihak (**PIHAK PERTAMA**, **PIHAK KEDUA**), nomor pasal/ayat di awal kalimat, atau istilah penting hukum lainnya.
-4. Untuk daftar poin, gunakan tanda strip/minus: - (bukan *).
-5. Setiap paragraf di dalam pasal ditulis sebagai teks biasa, BUKAN sebagai item list.
+2. GUNAKAN HEADING MARKDOWN: # untuk judul utama dokumen (ditulis di awal baris baru), ## untuk judul pasal (e.g., ## PASAL 1 - RUANG LINGKUP PEKERJAAN), ### untuk sub-bagian.
+3. Gunakan ** (double asterisk) HANYA untuk menebalkan kata atau teks penting di dalam kalimat, seperti nama Pihak (**PIHAK PERTAMA**, **PIHAK KEDUA**, **PARA PIHAK**). JANGAN menebalkan nomor ayat, nomor pasal, atau judul rincian daftar.
+4. JANGAN menggunakan bullet points (- atau *) di dalam pasal hukum. Di dalam pasal, jika ada daftar rincian/poin, gunakan huruf kecil (a., b., c., dst.) atau angka (1., 2., 3., dst.) dengan lekukan spasi di depannya. Simbol bullet/minus (-) hanya boleh digunakan di bagian luar pasal, seperti pada Klausul Premis (Bahwa...).
+5. Setiap paragraf di dalam pasal ditulis sebagai teks biasa atau diawali dengan nomor ayat.
 6. JANGAN menggunakan bullet points (- atau *) untuk rincian identitas para pihak (seperti nama, jabatan, alamat). Tuliskan rincian identitas tersebut sebagai baris paragraf biasa dengan format titik dua (:) sejajar tanpa simbol poin atau angka di depannya.
 7. JANGAN PERNAH membuat area tanda tangan, kolom tanda tangan, tabel tanda tangan, atau teks tanda tangan di akhir dokumen. Sistem kami akan menambahkan area tanda tangan secara otomatis di bagian bawah dokumen.
+8. PENULISAN NOMOR AYAT: Setiap ayat di dalam pasal harus ditulis di baris baru dan diawali dengan nomor ayat dalam tanda kurung biasa seperti (1), (2), (3) dst. (Contoh: (1) Pekerjaan sebagaimana dimaksud...). DILARANG KERAS menuliskan nomor ayat menggunakan cetak tebal seperti **1** atau **(1)**. Gunakan teks biasa.
+9. PENULISAN DAFTAR BERSARANG (NESTED LISTS): Jika rincian daftar berada di bawah suatu ayat, gunakan indentasi spasi yang sesuai agar terdeteksi sebagai sub-daftar (nested). Misalnya:
+   (1) Pihak Pertama berkewajiban untuk:
+       a. Melakukan pembayaran tepat waktu;
+       b. Menyediakan materi pendukung.
 
-ATURAN KONTEN SPK:
-1. Gunakan format dan bahasa hukum formal Indonesia yang sah.
-2. Sertakan pasal-pasal standar: pembukaan & dasar hukum, identitas para pihak, lingkup pekerjaan, jangka waktu, nilai kontrak & termin pembayaran, hak & kewajiban kedua belah pihak, pengalihan HAKI, force majeure, wanprestasi & sanksi denda, pembatalan & ganti rugi, penyelesaian sengketa, dan penutup penandatanganan.
-3. Pastikan ADIL untuk kedua belah pihak, terutama melindungi UMKM (Pihak Kedua):
-   - Sanksi denda keterlambatan berlaku dua arah (untuk UMKM dan untuk Klien)
-   - HAKI beralih SETELAH pelunasan 100%
-   - Ada klausul pembatalan yang adil (Pihak Pertama membayar biaya pekerjaan yang sudah berjalan jika membatalkan)
-   - Batas tanggung jawab maksimal (Limit of Liability)
-4. Buat draf yang LENGKAP dan PANJANG, minimal 12 pasal yang detail dan komprehensif.
-5. Setiap pasal harus memiliki minimal 2-4 ayat atau paragraf yang menjelaskan ketentuan secara rinci.`;
+ATURAN KONTEN SPK LENGKAP (HARUS LENGKAP & PANJANG):
+1. DILARANG menggunakan placeholder seperti "... [dan seterusnya] ...", "[Tuliskan kelanjutan pasal di sini]", atau melompati pasal dengan singkatan. Semua kalimat hukum, pasal, ayat, dan klausul harus ditulis secara LENGKAP, UTUH, dan DETAIL dari awal sampai akhir.
+2. Setiap pasal harus dirumuskan dalam minimal 2-4 ayat hukum yang jelas, komprehensif, profesional, dan akurat (menggunakan bahasa Indonesia hukum formal). Dilarang merumuskan pasal secara singkat hanya berupa 1 ayat saja jika pasal tersebut membutuhkan rincian.
+3. Struktur draf harus mengikuti sistematika hukum formal Indonesia berikut secara berurutan:
+   - JUDUL DOKUMEN (SURAT PERJANJIAN KERJA)
+   - KLAUSUL PEMBUKA & PENANGGALAN (Hari, tanggal, bulan, tahun, tempat penandatanganan)
+   - IDENTITAS PARA PIHAK (PIHAK PERTAMA dan PIHAK KEDUA secara lengkap)
+   - KLAUSUL PREMIS (Latar belakang kesepakatan)
+   - ## PASAL 1 - LINGKUP PEKERJAAN
+     Menjelaskan rincian detail lingkup kerja jasa yang diberikan secara mendalam oleh Pihak Kedua.
+   - ## PASAL 2 - JANGKA WAKTUNYA
+     Ayat (1) Masa berlaku perjanjian, Ayat (2) Batas waktu penyelesaian pekerjaan oleh Pihak Kedua, Ayat (3) Definisi Hari Kerja, Ayat (4) Prosedur perpanjangan jangka waktu jika ada hambatan.
+   - ## PASAL 3 - NILAI KONTRAK & BIAYA JASA
+     Ayat (1) Total nilai nominal kontrak secara terperinci, Ayat (2) Sifat biaya (tetap/fixed price) yang mencakup seluruh lingkup pekerjaan, Ayat (3) Status pembebanan pajak (PPN/PPh) sesuai peraturan perundang-undangan.
+   - ## PASAL 4 - SKEMA & TAHAPAN PEMBAYARAN
+     Ayat (1) Pembagian tahapan pembayaran (Termin/DP dan Pelunasan) secara nominal dan persentase, Ayat (2) Batas waktu pembayaran setelah tagihan diterima, Ayat (3) Detail rekening bank tujuan transfer Pihak Kedua.
+   - ## PASAL 5 - HAK DAN KEWAJIBAN PIHAK PERTAMA
+     Ayat (1) Hak Pihak Pertama (menerima hasil kerja, laporan kemajuan), Ayat (2) Kewajiban Pihak Pertama (membayar tepat waktu, menyediakan data pendukung).
+   - ## PASAL 6 - HAK DAN KEWAJIBAN PIHAK KEDUA
+     Ayat (1) Hak Pihak Kedua (menerima pembayaran tepat waktu, meminta data pendukung), Ayat (2) Kewajiban Pihak Kedua (menyelesaikan pekerjaan sesuai standar, menjaga kerahasiaan).
+   - ## PASAL 7 - HAK KEKAYAAN INTELEKTUAL (HAKI)
+     Ayat (1) Ketentuan kepemilikan hasil karya, Ayat (2) Ketentuan tegas bahwa pengalihan HAKI baru terjadi secara sah setelah pembayaran LUNAS 100% diterima oleh Pihak Kedua, Ayat (3) Status lisensi perangkat lunak pihak ketiga atau pustaka kode sumber terbuka.
+   - ## PASAL 8 - PERNYATAAN & JAMINAN
+     Ayat (1) Jaminan keaslian karya dari Pihak Kedua dan bebas dari klaim pihak ketiga, Ayat (2) Jaminan legalitas kepemilikan data/konten dari Pihak Pertama, Ayat (3) Kewenangan hukum masing-masing pihak untuk mengikatkan diri.
+   - ## PASAL 9 - WANPRESTASI & SANKSI KETERLAMBATAN
+     Ayat (1) Definisi tindakan wanprestasi dan prosedur peringatan tertulis, Ayat (2) Denda keterlambatan pekerjaan oleh Pihak Kedua (maksimal 5% dari nilai kontrak), Ayat (3) Denda keterlambatan pembayaran oleh Pihak Pertama (minimal 0.1% per hari).
+   - ## PASAL 10 - BATAS TANGGUNG JAWAB
+     Ayat (1) Batas ganti rugi maksimal Pihak Kedua dibatasi sebesar total nilai kontrak yang diterima, Ayat (2) Pengecualian ganti rugi atas kehilangan keuntungan bisnis atau reputasi, Ayat (3) Batas waktu pengajuan klaim ganti rugi setelah proyek selesai.
+   - ## PASAL 11 - KERAHAHASIAAN INFORMASI
+     Ayat (1) Definisi informasi rahasia, Ayat (2) Kewajiban menjaga rahasia data bisnis/teknis, Ayat (3) Masa berlaku kerahasiaan informasi (tetap mengikat minimal 3 tahun setelah perjanjian berakhir).
+   - ## PASAL 12 - KEADAAN MEMAKSA
+     Ayat (1) Kriteria keadaan memaksa (bencana alam, huru-hara, kebijakan pemerintah), Ayat (2) Prosedur pelaporan keadaan memaksa, Ayat (3) Pembebasan tanggung jawab denda selama masa keadaan memaksa.
+   - ## PASAL 13 - PEMBATALAN SEPIHAK & KOMPENSASI
+     Ayat (1) Larangan pembatalan sepihak tanpa kesepakatan bersama, Ayat (2) Kewajiban Pihak Pertama membayar kompensasi atas pekerjaan yang telah diselesaikan jika membatalkan proyek di tengah jalan, Ayat (3) Konsekuensi hangusnya Uang Muka.
+   - ## PASAL 14 - PENYELESAIAN SENGKETA & DOMISILI HUKUM
+     Ayat (1) Penyelesaian sengketa melalui musyawarah mufakat, Ayat (2) Mediasi dengan pihak ketiga, Ayat (3) Pemilihan domisili hukum di Pengadilan Negeri setempat.
+   - KLAUSUL PENUTUP (Teks pernyataan penutup penandatanganan)
+   Setiap pasal di atas wajib kamu tuliskan nomor pasalnya dalam format ## PASAL X - NAMA PASAL.`;
 
 /* ================================================================
    5. MODEL INSTANCES — Factory functions untuk model Gemini
@@ -256,19 +298,19 @@ const analyzeGenerationConfig: GenerationConfig = {
 
 /** Konfigurasi generation untuk draf SPK (respons teks Markdown) */
 const generateGenerationConfig: GenerationConfig = {
-  temperature: 0.5,
-  topP: 0.9,
-  maxOutputTokens: 8192,
+  temperature: 0.4, // Sedikit lebih tinggi agar model tidak memotong output
+  topP: 0.92,
+  maxOutputTokens: 16384, // Token tinggi agar SPK 14 pasal dapat ditulis penuh
   responseMimeType: "text/plain",
 };
 
 /**
  * Membuat model Gemini untuk analisis kontrak.
- * Menggunakan `gemini-2.5-flash` dan schema JSON terstruktur.
+ * Menggunakan model yang ditentukan secara dinamis.
  */
-export function getAnalyzeModel() {
+export function getAnalyzeModel(modelName: string = "gemini-3.5-flash") {
   return genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: modelName,
     systemInstruction: ANALYZE_SYSTEM_INSTRUCTION,
     generationConfig: analyzeGenerationConfig,
   });
@@ -276,14 +318,67 @@ export function getAnalyzeModel() {
 
 /**
  * Membuat model Gemini untuk menghasilkan draf SPK.
- * Menggunakan `gemini-1.5-flash` untuk efisiensi kuota dengan output Markdown bersih.
+ * Menggunakan model yang ditentukan secara dinamis.
  */
-export function getGenerateModel() {
+export function getGenerateModel(modelName: string = "gemini-3.5-flash") {
   return genAI.getGenerativeModel({
-    model: "gemini-2.5-flash",
+    model: modelName,
     systemInstruction: GENERATE_SYSTEM_INSTRUCTION,
     generationConfig: generateGenerationConfig,
   });
+}
+
+/**
+ * Melakukan generateContent dengan prioritas gemini-3.5-flash demi stabilitas tinggi,
+ * lalu otomatis fallback secara kaskade ke model alternatif jika terkena limitasi (429)
+ * atau jika model tidak ditemukan (404).
+ */
+export async function generateContentWithFallback(
+  modelType: "analyze" | "generate",
+  prompt: string
+) {
+  // Rantai fallback model yang terbukti aktif dan memiliki kuota
+  const modelChain = [
+    "gemini-2.5-pro",
+    "gemini-3.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash"
+  ];
+  
+  let lastError: any = null;
+
+  for (const modelName of modelChain) {
+    const model = modelType === "analyze" ? getAnalyzeModel(modelName) : getGenerateModel(modelName);
+    
+    try {
+      console.log(`[Gemini] Mencoba model: ${modelName} untuk tipe: ${modelType}`);
+      const result = await model.generateContent(prompt);
+      console.log(`[Gemini] Sukses menggunakan model: ${modelName}`);
+      return result;
+    } catch (error: any) {
+      lastError = error;
+      const message = error?.message || "";
+      console.warn(`[Gemini] Gagal menggunakan model ${modelName}:`, message);
+      
+      const isRecoverable = 
+        message.includes("404") ||
+        message.includes("429") ||
+        message.includes("503") ||
+        message.includes("500") ||
+        message.includes("Service Unavailable") ||
+        message.includes("RESOURCE_EXHAUSTED") ||
+        message.includes("quota") ||
+        message.includes("Quota") ||
+        message.includes("not found");
+        
+      if (!isRecoverable) {
+        throw error;
+      }
+    }
+  }
+  
+  throw lastError || new Error("Semua model Gemini dalam fallback chain gagal diproses.");
 }
 
 /* ================================================================
@@ -294,9 +389,7 @@ export function getGenerateModel() {
  * Mengekstrak teks dari respons Gemini secara aman.
  * Menangani kasus dimana candidate kosong atau teks tidak tersedia.
  */
-export function extractResponseText(
-  result: Awaited<ReturnType<ReturnType<typeof getAnalyzeModel>["generateContent"]>>
-): string {
+export function extractResponseText(result: { response: { text: () => string } }): string {
   const text = result.response.text();
   if (!text) {
     throw new Error("Gemini tidak mengembalikan teks respons.");

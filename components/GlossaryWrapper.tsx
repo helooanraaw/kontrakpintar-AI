@@ -3,7 +3,7 @@
 import React from "react";
 import { glossaryData } from "@/lib/glossaryData";
 import { Tooltip } from "./ui/Tooltip";
-import { parseMarkdownBlocks } from "@/lib/markdownParser";
+import { parseMarkdownBlocks, shouldIndentParagraph } from "@/lib/markdownParser";
 
 interface GlossaryWrapperProps {
   text: string;
@@ -125,35 +125,64 @@ export const GlossaryWrapper: React.FC<GlossaryWrapperProps> = ({ text }) => {
           </p>
         );
         break;
-      case "paragraph":
-        elements.push(
-          <p 
-            key={`p-std-${b}`}
-            className="text-justify text-slate-grille leading-relaxed mb-3 indent-6"
-          >
-            {renderTextWithGlossaryAndBold(block.content || "")}
-          </p>
-        );
+      case "paragraph": {
+        const content = block.content || "";
+        const trimmed = content.trim();
+        const match = trimmed.match(/^([\w\s]{2,30})\s*:\s*(.*)$/);
+        const isHeader = /^\*\*PIHAK\s+[A-Z\s]+\*\*$/i.test(trimmed) || /^\*\*PARA\s+PIHAK\*\*$/i.test(trimmed);
+        
+        if (isHeader) {
+          elements.push(
+            <p key={`p-hdr-${b}`} className="font-bold text-midnight-ink mt-5 mb-1 text-justify leading-normal" style={{ lineHeight: "1.5" }}>
+              {renderTextWithGlossaryAndBold(content)}
+            </p>
+          );
+        } else if (match) {
+          const key = match[1].trim();
+          const val = match[2].trim();
+          elements.push(
+            <div key={`p-id-${b}`} className="grid grid-cols-[140px_20px_1fr] sm:grid-cols-[180px_20px_1fr] gap-0 mb-1 text-sm sm:text-base leading-normal text-slate-grille" style={{ lineHeight: "1.5" }}>
+              <span className="font-medium text-midnight-ink">{renderTextWithGlossaryAndBold(key)}</span>
+              <span className="text-center select-none">:</span>
+              <span className="text-justify">{renderTextWithGlossaryAndBold(val)}</span>
+            </div>
+          );
+        } else {
+          const needsIndent = shouldIndentParagraph(content);
+          elements.push(
+            <p 
+              key={`p-std-${b}`} 
+              className={`text-justify text-slate-grille leading-normal mb-3 ${needsIndent ? "indent-6" : "indent-0"}`}
+              style={{ lineHeight: "1.5" }}
+            >
+              {renderTextWithGlossaryAndBold(content)}
+            </p>
+          );
+        }
         break;
+      }
       case "list":
         if (block.items) {
           const listItemsHtml = block.items.map((item, idx) => {
+            const depth = item.depth || 0;
+            const paddingClass = depth === 1 ? "pl-12" : depth === 2 ? "pl-[4.5rem]" : "pl-6";
+            
             if (item.type === "bullet") {
               return (
-                <div key={`li-b-${idx}`} className="flex items-start gap-2 mb-2 text-justify pl-6">
+                <div key={`li-b-${idx}`} className={`flex items-start gap-2 mb-2 text-justify ${paddingClass}`}>
                   <span className="text-midnight-ink select-none shrink-0 w-4 text-center">•</span>
-                  <span className="flex-1 text-slate-grille leading-relaxed">
+                  <span className="flex-1 text-slate-grille leading-normal" style={{ lineHeight: "1.5" }}>
                     {renderTextWithGlossaryAndBold(item.content)}
                   </span>
                 </div>
               );
             } else {
               return (
-                <div key={`li-n-${idx}`} className="flex items-start gap-2 mb-3 text-justify pl-6">
+                <div key={`li-n-${idx}`} className={`flex items-start gap-2 mb-3 text-justify ${paddingClass}`}>
                   <span className="font-semibold text-midnight-ink select-none shrink-0 min-w-[1.5rem] text-left">
                     {item.prefix}
                   </span>
-                  <span className="flex-1 text-slate-grille leading-relaxed">
+                  <span className="flex-1 text-slate-grille leading-normal" style={{ lineHeight: "1.5" }}>
                     {renderTextWithGlossaryAndBold(item.content)}
                   </span>
                 </div>
@@ -170,7 +199,7 @@ export const GlossaryWrapper: React.FC<GlossaryWrapperProps> = ({ text }) => {
     }
   });
   
-  return <div className="space-y-1 font-sans text-sm sm:text-base">{elements}</div>;
+  return <div className="space-y-1 font-sans text-sm sm:text-base leading-normal" style={{ lineHeight: "1.5" }}>{elements}</div>;
 };
 
 export default GlossaryWrapper;

@@ -516,7 +516,7 @@ function DashboardPageContent() {
 
   return (
     <div className="min-h-[calc(100vh-61px)] w-full bg-canvas font-sans antialiased text-midnight-ink">
-      <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
+      <div className={activeTab === "analyzer" || activeTab === "wizard" ? "max-w-7xl mx-auto px-4 md:px-6 lg:px-8 pt-4 md:pt-6 lg:pt-8 pb-0" : "max-w-7xl mx-auto p-4 md:p-6 lg:p-8"}>
 
             {/* ── OVERVIEW TAB ── */}
             {activeTab === "overview" && (
@@ -931,7 +931,7 @@ function DashboardPageContent() {
 
             {/* ── ANALYZER TAB ── */}
             {activeTab === "analyzer" && (
-              <div className="animate-fade-up h-full">
+              <div className="animate-fade-up" style={{ height: "calc(100vh - 140px)", minHeight: 560, display: "flex", flexDirection: "column" }}>
                 <SplitScreenAnalyzer 
                   initialText={selectedAnalysisText} 
                   initialResult={selectedAnalysisResult} 

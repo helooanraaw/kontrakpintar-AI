@@ -23,7 +23,7 @@ import {
 import { Button } from "./ui/Button";
 import { GlossaryWrapper } from "./GlossaryWrapper";
 import { checkCanGenerate, incrementUsageCount } from "@/lib/limits";
-import { parseMarkdownBlocks, convertMarkdownFormatting } from "@/lib/markdownParser";
+import { parseMarkdownBlocks, convertMarkdownFormatting, shouldIndentParagraph } from "@/lib/markdownParser";
 
 const LOADING_STATUSES = [
   "Menganalisis kebutuhan para pihak...",
@@ -227,57 +227,75 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
       switch (block.type) {
         case "h1":
           htmlBlocks.push(
-            `<h1 style="text-align:center;font-size:14pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:0;margin-bottom:18pt;text-transform:uppercase;line-height:1.5;">${convertMarkdownFormatting(block.content || "")}</h1>`
+            `<h1 style="text-align:center;font-size:14pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:0;margin-bottom:18pt;text-transform:uppercase;line-height:150%;mso-line-height-rule:exactly;">${convertMarkdownFormatting(block.content || "")}</h1>`
           );
           break;
         case "h2":
           if (block.isPasal) {
             htmlBlocks.push(
-              `<h2 style="text-align:center;font-size:12pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:24pt;margin-bottom:12pt;text-transform:uppercase;line-height:1.5;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.pasalNum || "")}<br/>${convertMarkdownFormatting(block.pasalTitle || "")}</h2>`
+              `<h2 style="text-align:center;font-size:12pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:24pt;margin-bottom:12pt;text-transform:uppercase;line-height:150%;mso-line-height-rule:exactly;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.pasalNum || "")}<br/>${convertMarkdownFormatting(block.pasalTitle || "")}</h2>`
             );
           } else {
             htmlBlocks.push(
-              `<h2 style="text-align:center;font-size:12pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:24pt;margin-bottom:12pt;text-transform:uppercase;line-height:1.5;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.content || "")}</h2>`
+              `<h2 style="text-align:center;font-size:12pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:24pt;margin-bottom:12pt;text-transform:uppercase;line-height:150%;mso-line-height-rule:exactly;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.content || "")}</h2>`
             );
           }
           break;
         case "h3":
           htmlBlocks.push(
-            `<h3 style="font-size:11pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:12pt;margin-bottom:6pt;line-height:1.5;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.content || "")}</h3>`
+            `<h3 style="font-size:11pt;font-family:'Times New Roman',serif;font-weight:bold;margin-top:12pt;margin-bottom:6pt;line-height:150%;mso-line-height-rule:exactly;page-break-after:avoid;break-after:avoid;">${convertMarkdownFormatting(block.content || "")}</h3>`
           );
           break;
         case "center-bold":
           htmlBlocks.push(
-            `<p style="text-align:center;font-size:11pt;font-family:'Times New Roman',serif;font-weight:bold;line-height:1.5;margin-top:-6pt;margin-bottom:18pt;color:#000;">${convertMarkdownFormatting(block.content || "")}</p>`
+            `<p style="text-align:center;font-size:11pt;font-family:'Times New Roman',serif;font-weight:bold;line-height:150%;mso-line-height-rule:exactly;margin-top:-6pt;margin-bottom:18pt;color:#000;">${convertMarkdownFormatting(block.content || "")}</p>`
           );
           break;
-        case "paragraph":
-          htmlBlocks.push(
-            `<p style="font-size:11pt;font-family:'Times New Roman',serif;text-align:justify;line-height:1.5;margin:0 0 8pt 0;text-indent:1.25cm;color:#000;">${convertMarkdownFormatting(block.content || "")}</p>`
-          );
+        case "paragraph": {
+          const content = block.content || "";
+          const trimmed = content.trim();
+          const match = trimmed.match(/^([\w\s]{2,30})\s*:\s*(.*)$/);
+          const isHeader = /^\*\*PIHAK\s+[A-Z\s]+\*\*$/i.test(trimmed) || /^\*\*PARA\s+PIHAK\*\*$/i.test(trimmed);
+          
+          if (isHeader) {
+            const style = "font-size:11pt;font-family:'Times New Roman',serif;line-height:150%;mso-line-height-rule:exactly;color:#000;margin:12pt 0 4pt 0;text-indent:0;font-weight:bold;";
+            htmlBlocks.push(`<p style="${style}">${convertMarkdownFormatting(content)}</p>`);
+          } else if (match) {
+            const key = match[1].trim();
+            const val = match[2].trim();
+            htmlBlocks.push(`
+              <table style="width:100%;border:none;margin:0 0 3pt 0;border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;">
+                <tr style="border:none;">
+                  <td style="width:120pt;font-family:'Times New Roman',serif;font-size:11pt;line-height:150%;mso-line-height-rule:exactly;color:#000;vertical-align:top;border:none;padding:0;">${convertMarkdownFormatting(key)}</td>
+                  <td style="width:15pt;font-family:'Times New Roman',serif;font-size:11pt;line-height:150%;mso-line-height-rule:exactly;color:#000;vertical-align:top;border:none;padding:0;text-align:center;">:</td>
+                  <td style="font-family:'Times New Roman',serif;font-size:11pt;line-height:150%;mso-line-height-rule:exactly;color:#000;vertical-align:top;border:none;padding:0;text-align:justify;">${convertMarkdownFormatting(val)}</td>
+                </tr>
+              </table>
+            `);
+          } else {
+            const needsIndent = shouldIndentParagraph(content);
+            const style = `font-size:11pt;font-family:'Times New Roman',serif;text-align:justify;line-height:150%;mso-line-height-rule:exactly;color:#000;margin:0 0 8pt 0;${needsIndent ? "text-indent:1.25cm;" : "text-indent:0;"}`;
+            htmlBlocks.push(`<p style="${style}">${convertMarkdownFormatting(content)}</p>`);
+          }
           break;
+        }
         case "list":
           if (block.items) {
             const listHtml = block.items.map((item) => {
+              const depth = item.depth || 0;
+              const marginLeft = depth === 1 ? "2.75cm" : depth === 2 ? "3.5cm" : "2.0cm";
+              
               if (item.type === "bullet") {
                 return `
-                  <table class="list-table" style="width:100%;border-collapse:collapse;border:none;margin:0 0 6pt;padding:0;page-break-inside:avoid;break-inside:avoid;">
-                    <tr style="border:none;">
-                      <td style="width:1.25cm;padding:0;border:none;"></td>
-                      <td style="width:0.5cm;vertical-align:top;text-align:left;padding:0;font-family:'Times New Roman',serif;font-size:11pt;line-height:1.5;color:#000;border:none;">•</td>
-                      <td style="vertical-align:top;text-align:justify;padding:0;font-family:'Times New Roman',serif;font-size:11pt;line-height:1.5;color:#000;border:none;">${convertMarkdownFormatting(item.content)}</td>
-                    </tr>
-                  </table>
+                  <p style="font-size:11pt;font-family:'Times New Roman',serif;text-align:justify;line-height:150%;mso-line-height-rule:exactly;margin:0 0 6pt ${marginLeft};text-indent:-0.75cm;color:#000;page-break-inside:avoid;break-inside:avoid;">
+                    •&nbsp;&nbsp;&nbsp;${convertMarkdownFormatting(item.content)}
+                  </p>
                 `;
               } else {
                 return `
-                  <table class="list-table" style="width:100%;border-collapse:collapse;border:none;margin:0 0 8pt;padding:0;page-break-inside:avoid;break-inside:avoid;">
-                    <tr style="border:none;">
-                      <td style="width:1.25cm;padding:0;border:none;"></td>
-                      <td style="width:0.75cm;vertical-align:top;text-align:left;padding:0;font-family:'Times New Roman',serif;font-size:11pt;line-height:1.5;font-weight:bold;color:#000;border:none;">${item.prefix}</td>
-                      <td style="vertical-align:top;text-align:justify;padding:0;font-family:'Times New Roman',serif;font-size:11pt;line-height:1.5;color:#000;border:none;">${convertMarkdownFormatting(item.content)}</td>
-                    </tr>
-                  </table>
+                  <p style="font-size:11pt;font-family:'Times New Roman',serif;text-align:justify;line-height:150%;mso-line-height-rule:exactly;margin:0 0 8pt ${marginLeft};text-indent:-0.75cm;color:#000;page-break-inside:avoid;break-inside:avoid;">
+                    <strong>${item.prefix}</strong>&nbsp;&nbsp;&nbsp;${convertMarkdownFormatting(item.content)}
+                  </p>
                 `;
               }
             }).join("");
@@ -341,13 +359,15 @@ div.Section1 {
 body {
   font-family: 'Times New Roman', serif;
   font-size: 11pt;
-  line-height: 1.5;
+  line-height: 150%;
+  mso-line-height-rule: exactly;
 }
 p {
   margin: 0in 0in 8pt;
   font-family: 'Times New Roman', serif;
   font-size: 11pt;
-  line-height: 1.5;
+  line-height: 150%;
+  mso-line-height-rule: exactly;
   text-align: justify;
 }
 h1 {
@@ -358,7 +378,8 @@ h1 {
   text-transform: uppercase;
   margin-top: 12pt;
   margin-bottom: 12pt;
-  line-height: 1.5;
+  line-height: 150%;
+  mso-line-height-rule: exactly;
 }
 h2 {
   font-family: 'Times New Roman', serif;
@@ -368,7 +389,8 @@ h2 {
   text-transform: uppercase;
   margin-top: 24pt;
   margin-bottom: 12pt;
-  line-height: 1.5;
+  line-height: 150%;
+  mso-line-height-rule: exactly;
   page-break-after: avoid;
 }
 h3 {
@@ -377,7 +399,8 @@ h3 {
   font-weight: bold;
   margin-top: 12pt;
   margin-bottom: 6pt;
-  line-height: 1.5;
+  line-height: 150%;
+  mso-line-height-rule: exactly;
   page-break-after: avoid;
 }
 </style>

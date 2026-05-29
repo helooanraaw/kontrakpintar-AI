@@ -11,7 +11,7 @@
 
 import { NextRequest } from "next/server";
 import {
-  getAnalyzeModel,
+  generateContentWithFallback,
   extractResponseText,
   type AnalyzeRequest,
   type AnalysisResult,
@@ -62,9 +62,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    /* ── 2. Kirim ke Gemini 1.5 Flash ─────────────────── */
-    const model = getAnalyzeModel();
-
+    /* ── 2. Kirim ke Gemini 1.5 Flash (dengan Fallback otomatis) ── */
     const prompt = `Analisis kontrak berikut dan identifikasi semua pasal yang berpotensi merugikan pihak UMKM:
 
 ---MULAI KONTRAK---
@@ -73,7 +71,7 @@ ${contractText}
 
 Berikan analisis lengkap sesuai format JSON yang diminta.`;
 
-    const result = await model.generateContent(prompt);
+    const result = await generateContentWithFallback("analyze", prompt);
     const responseText = extractResponseText(result);
 
     /* ── 3. Parse respons JSON dari Gemini ────────────── */
@@ -138,7 +136,7 @@ Berikan analisis lengkap sesuai format JSON yang diminta.`;
       return Response.json(
         {
           error:
-            "Batas kuota harian Gemini API gratis Anda telah habis (Maksimum 20 permintaan/hari untuk model gemini-2.5-flash). Silakan gunakan API Key yang berbeda di file .env.local atau coba lagi setelah kuota harian Anda di-reset secara otomatis oleh Google.",
+            "Batas kuota harian Gemini API gratis Anda telah habis. Silakan gunakan API Key yang berbeda di file .env.local atau coba lagi setelah beberapa saat.",
           code: "RATE_LIMIT",
         },
         { status: 429 }

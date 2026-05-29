@@ -9,13 +9,20 @@
  * ─────────────────────────────────────────────────────────────
  */
 
+export interface ListItem {
+  type: "bullet" | "numbered";
+  prefix?: string;
+  content: string;
+  depth: number;
+}
+
 export interface Block {
   type: "h1" | "h2" | "h3" | "center-bold" | "paragraph" | "list";
   content?: string;
   isPasal?: boolean;
   pasalNum?: string;
   pasalTitle?: string;
-  items?: Array<{ type: "bullet" | "numbered"; prefix?: string; content: string }>;
+  items?: ListItem[];
 }
 
 /**
@@ -26,6 +33,52 @@ export const convertMarkdownFormatting = (text: string): string => {
   return text
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     .replace(/\*(.*?)\*/g, "<em>$1</em>");
+};
+
+/**
+ * Menentukan apakah sebuah paragraf membutuhkan indentasi awal (first-line indent)
+ */
+export const shouldIndentParagraph = (content: string): boolean => {
+  const trimmed = content.trim();
+  
+  // Jangan indent jika:
+  // 1. Merupakan header pihak (e.g. **PIHAK PERTAMA**, **PARA PIHAK**)
+  if (trimmed.startsWith("**PIHAK") || trimmed.startsWith("**PARA PIHAK")) {
+    return false;
+  }
+  
+  // 2. Merupakan field identitas (e.g. Nama Perusahaan: ...)
+  const isIdentityField = /^([\w\s]{2,30})\s*:\s*(.*)$/.test(trimmed);
+  if (isIdentityField) {
+    return false;
+  }
+  
+  // 3. Merupakan baris pendek pembuka/penutup yang tidak membutuhkan indentasi
+  if (trimmed.length < 40 && !trimmed.includes("Pasal") && !trimmed.includes("Ayat")) {
+    return false;
+  }
+
+  // 4. Merupakan ayat atau penomoran list yang tidak teridentifikasi sebagai list oleh parser utama
+  if (/^\(\d+\)/.test(trimmed) || /^\d+\./.test(trimmed)) {
+    return false;
+  }
+  
+  return true;
+};
+
+const getLineIndent = (line: string): number => {
+  const match = line.match(/^(\s*)/);
+  if (!match) return 0;
+  const spaces = match[1];
+  let indent = 0;
+  for (let i = 0; i < spaces.length; i++) {
+    if (spaces[i] === "\t") {
+      indent += 4;
+    } else {
+      indent += 1;
+    }
+  }
+  return indent;
 };
 
 /**
@@ -47,15 +100,37 @@ export const parseMarkdownBlocks = (md: string): Block[] => {
   const blocks: Block[] = [];
 
   let activeParagraphLines: string[] = [];
-  let activeListItems: Array<{ type: "bullet" | "numbered"; prefix?: string; content: string }> = [];
+  let activeListItems: ListItem[] = [];
   let activeListType: "bullet" | "numbered" | null = null;
 
   const flushParagraph = () => {
     if (activeParagraphLines.length > 0) {
-      const content = activeParagraphLines.join(" ").trim();
-      if (content) {
-        blocks.push({ type: "paragraph", content });
+      let currentGroup: string[] = [];
+      
+      for (const line of activeParagraphLines) {
+        const trimmed = line.trim();
+        
+        // Cek apakah baris ini adalah field identitas (e.g., Nama: Budi) atau header Pihak
+        const isIdentityField = /^([\w\s]{2,30})\s*:\s*(.*)$/.test(trimmed);
+        const isPartyHeader = /^\*\*PIHAK\s+[A-Z\s]+\*\*$/i.test(trimmed) || /^\*\*PARA\s+PIHAK\*\*$/i.test(trimmed);
+        
+        if (isIdentityField || isPartyHeader) {
+          // Jika ada kalimat terakumulasi sebelumnya, flush
+          if (currentGroup.length > 0) {
+            blocks.push({ type: "paragraph", content: currentGroup.join(" ").trim() });
+            currentGroup = [];
+          }
+          // Tambahkan baris identitas/header ini sebagai paragraf tersendiri
+          blocks.push({ type: "paragraph", content: trimmed });
+        } else {
+          currentGroup.push(trimmed);
+        }
       }
+      
+      if (currentGroup.length > 0) {
+        blocks.push({ type: "paragraph", content: currentGroup.join(" ").trim() });
+      }
+      
       activeParagraphLines = [];
     }
   };
@@ -141,11 +216,13 @@ export const parseMarkdownBlocks = (md: string): Block[] => {
     if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
       flushParagraph();
       const content = trimmed.substring(2).trim();
+      const indent = getLineIndent(line);
+      const depth = indent < 2 ? 0 : indent < 6 ? 1 : 2;
       if (activeListType !== "bullet") {
         flushList();
         activeListType = "bullet";
       }
-      activeListItems.push({ type: "bullet", content });
+      activeListItems.push({ type: "bullet", content, depth });
       continue;
     }
 
@@ -156,11 +233,13 @@ export const parseMarkdownBlocks = (md: string): Block[] => {
       if (match) {
         const prefix = match[1].trim();
         const content = match[2].trim();
+        const indent = getLineIndent(line);
+        const depth = indent < 2 ? 0 : indent < 6 ? 1 : 2;
         if (activeListType !== "numbered") {
           flushList();
           activeListType = "numbered";
         }
-        activeListItems.push({ type: "numbered", prefix, content });
+        activeListItems.push({ type: "numbered", prefix, content, depth });
       }
       continue;
     }

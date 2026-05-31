@@ -4,62 +4,105 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import {
   ShieldAlert,
+  ShieldCheck,
   CheckCircle,
   Copy,
   Check,
   RotateCcw,
   Sparkles,
-  AlertTriangle,
-  Info,
-  ArrowRight,
+  Flag,
+  Scale,
   Upload,
-  FileUp,
+  UploadCloud,
   Loader2,
-  Eye,
+  ScanLine,
   Plus,
   Trash2,
-  GitCompare,
+  ArrowLeftRight,
   FileText,
-  FolderOpen,
-  Printer
+  PanelLeft,
+  Printer,
+  Bot,
+  Send,
+  BookOpen,
 } from "lucide-react";
 import { Button } from "./ui/Button";
 import { GlossaryWrapper } from "./GlossaryWrapper";
 import type { AnalysisResult } from "@/lib/gemini";
 import { checkCanGenerate, incrementUsageCount } from "@/lib/limits";
 
-// Contoh draf kontrak untuk demo
-const SAMPLE_CONTRACT = `SURAT PERJANJIAN KERJASAMA
-Antara Pihak Pertama (Klien Jaya) dan Pihak Kedua (UMKM Kreatif)
+// ─────────────────────────────────────────────
+// A. FRICTION-REDUCER: Mock Contract Samples
+// ─────────────────────────────────────────────
+const SAMPLE_CONTRACTS: Record<string, { label: string; emoji: string; fileName: string; text: string }> = {
+  spk_desain: {
+    label: "SPK Jasa Desain Grafis",
+    emoji: "",
+    fileName: "spk_jasa_desain_grafis.txt",
+    text: `SURAT PERJANJIAN KERJASAMA JASA DESAIN GRAFIS
+Antara Pihak Pertama (CV Kreatif Nusantara) dan Pihak Kedua (Studio Karya Mandiri)
 
 Pasal 1: LINGKUP PEKERJAAN
-Pihak Kedua berkewajiban membuatkan sistem aplikasi e-commerce dalam waktu 30 hari kerja sejak perjanjian ditandatangani.
+Pihak Kedua berkewajiban membuatkan desain logo, identitas visual (brand guideline), dan materi pemasaran (brosur, banner digital) dalam waktu 30 hari kerja sejak perjanjian ditandatangani.
 
 Pasal 2: NILAI KONTRAK & PEMBAYARAN
-Total nilai kontrak adalah Rp 15.000.000. Pembayaran dilakukan secara penuh 100% setelah seluruh proyek selesai diserahkan dan disetujui Pihak Pertama. Tidak ada pembayaran uang muka (DP).
+Total nilai kontrak adalah Rp 15.000.000. Pembayaran dilakukan secara penuh 100% setelah seluruh proyek selesai diserahkan dan disetujui Pihak Pertama. Tidak ada pembayaran uang muka (DP) sama sekali.
 
 Pasal 3: FORCE MAJEURE
 Apabila terjadi bencana alam yang menghambat proyek, Pihak Kedua tetap wajib menyelesaikan proyek tepat waktu tanpa toleransi keterlambatan, atau dikenakan denda Wanprestasi penuh.
 
 Pasal 4: SANKSI KETERLAMBATAN
-Setiap hari keterlambatan penyelesaian proyek oleh Pihak Kedua akan dikenakan denda sebesar 2% dari total nilai kontrak per hari keterlambatan tanpa ada batas denda.
+Setiap hari keterlambatan penyelesaian proyek oleh Pihak Kedua akan dikenakan denda sebesar 2% dari total nilai kontrak per hari keterlambatan tanpa ada batas denda maksimum.
 
 Pasal 5: HAK KEKAYAAN INTELEKTUAL
-Seluruh hak cipta, source code, dan aset desain yang dibuat oleh Pihak Kedua dalam proyek ini sepenuhnya langsung menjadi milik Pihak Pertama sejak draf kode pertama dibuat, bahkan jika pembayaran belum lunas.
+Seluruh hak cipta, file desain sumber, dan aset visual yang dibuat oleh Pihak Kedua dalam proyek ini sepenuhnya langsung menjadi milik Pihak Pertama sejak sketsa pertama dibuat, bahkan jika pembayaran belum lunas.
 
-Pasal 6: GANTI RUGI & TUNTUTAN HUKUM
-Pihak Kedua wajib menanggung seluruh ganti rugi tanpa batas (unlimited indemnification) atas segala gugatan pihak ketiga yang timbul akibat penggunaan aplikasi ini di masa depan, baik karena kesalahan teknis maupun kelalaian penggunaan dari Pihak Pertama sendiri.`;
+Pasal 6: REVISI & PERUBAHAN DESAIN
+Pihak Pertama berhak meminta perubahan desain tanpa batas jumlah dan tanpa biaya tambahan, kapan pun selama proyek berlangsung hingga 1 tahun setelah serah terima.
+
+Pasal 7: GANTI RUGI & TUNTUTAN HUKUM
+Pihak Kedua wajib menanggung seluruh ganti rugi tanpa batas (unlimited indemnification) atas segala gugatan pihak ketiga yang timbul akibat penggunaan aset desain ini di masa depan, baik karena kelalaian Pihak Pertama maupun pihak lain.`,
+  },
+  mou_pemasok: {
+    label: "MoU Pemasok Bahan Baku",
+    emoji: "",
+    fileName: "mou_pemasok_bahan_baku.txt",
+    text: `MEMORANDUM OF UNDERSTANDING (MoU)
+PERJANJIAN PEMASOK BAHAN BAKU KUE DAN ROTI
+Antara: UD Sumber Manis (Pemasok) dan Toko Kue Bahagia (Pembeli)
+
+Pasal 1: TUJUAN PERJANJIAN
+Para pihak sepakat untuk menjalin hubungan kerja sama jangka panjang dalam pengadaan bahan baku kue dan roti (tepung terigu, mentega, gula pasir, telur) selama 12 bulan terhitung sejak tanggal penandatanganan.
+
+Pasal 2: HARGA & PEMBAYARAN
+Harga bahan baku mengikuti daftar harga yang ditetapkan secara sepihak oleh Pihak Pemasok dan dapat berubah kapan saja tanpa pemberitahuan minimal 30 hari terlebih dahulu kepada Pembeli.
+
+Pasal 3: PENGIRIMAN & TOLERANSI MUTU
+Pemasok menjamin pengiriman dalam 3 hari kerja. Namun apabila terjadi keterlambatan pengiriman, Pemasok tidak bertanggung jawab atas kerugian produksi yang dialami Pembeli akibat ketiadaan stok.
+
+Pasal 4: KLAUSUL EKSKLUSIVITAS
+Pihak Pembeli tidak diperbolehkan membeli bahan baku sejenis dari pemasok lain selama masa perjanjian berlaku, meskipun Pihak Pemasok tidak dapat memenuhi kebutuhan stok Pembeli.
+
+Pasal 5: PENGEMBALIAN BARANG
+Barang yang telah dikirim tidak dapat dikembalikan dengan alasan apapun, termasuk jika ditemukan kondisi barang yang tidak sesuai standar mutu yang disepakati.
+
+Pasal 6: PEMUTUSAN PERJANJIAN
+Pihak Pemasok berhak memutus perjanjian ini kapan saja tanpa kompensasi kepada Pembeli, sedangkan Pembeli hanya dapat memutus perjanjian dengan membayar penalti sebesar 30% dari estimasi total nilai pembelian 6 bulan ke depan.`,
+  },
+};
+
+// ─────────────────────────────────────────────
+// Legacy single sample (backward compat)
+// ─────────────────────────────────────────────
+const SAMPLE_CONTRACT = SAMPLE_CONTRACTS.spk_desain.text;
 
 const compressImage = (file: File): Promise<Blob | File> => {
   return new Promise((resolve) => {
     const ext = file.name.split(".").pop()?.toLowerCase();
-    
-    // Jangan kompres jika file sangat kecil (< 150KB) dan sudah format jpeg/jpg
     if (file.size < 150 * 1024 && (ext === "jpg" || ext === "jpeg")) {
       resolve(file);
       return;
     }
-
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
@@ -69,8 +112,6 @@ const compressImage = (file: File): Promise<Blob | File> => {
         const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
-        
-        // Batasi dimensi maksimal ke 1400px (tajam untuk OCR dan ramah memori/lebar pita)
         const MAX_DIM = 1400;
         if (width > MAX_DIM || height > MAX_DIM) {
           if (width > height) {
@@ -81,7 +122,6 @@ const compressImage = (file: File): Promise<Blob | File> => {
             height = MAX_DIM;
           }
         }
-        
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext("2d");
@@ -90,7 +130,6 @@ const compressImage = (file: File): Promise<Blob | File> => {
           canvas.toBlob(
             (blob) => {
               if (blob) {
-                // Berikan nama file baru dengan ekstensi .jpg
                 const baseName = file.name.substring(0, file.name.lastIndexOf(".")) || file.name;
                 resolve(new File([blob], `${baseName}.jpg`, { type: "image/jpeg" }));
               } else {
@@ -98,7 +137,7 @@ const compressImage = (file: File): Promise<Blob | File> => {
               }
             },
             "image/jpeg",
-            0.75 // Kualitas JPEG 75%
+            0.75
           );
         } else {
           resolve(file);
@@ -126,7 +165,6 @@ const fetchWithRetry = async (
         response.status === 504 ||
         response.status === 500;
       if (isTransient && retries > 0) {
-        console.warn(`[OCR Retry] Server error ${response.status}. Mencoba kembali... Sisa percobaan: ${retries}`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         return fetchWithRetry(url, options, retries - 1, delay);
       }
@@ -135,7 +173,6 @@ const fetchWithRetry = async (
     return response;
   } catch (error: any) {
     if (retries > 0) {
-      console.warn(`[OCR Retry] Koneksi gagal. Mencoba kembali... Sisa percobaan: ${retries}`, error.message || error);
       await new Promise((resolve) => setTimeout(resolve, delay));
       return fetchWithRetry(url, options, retries - 1, delay);
     }
@@ -143,6 +180,9 @@ const fetchWithRetry = async (
   }
 };
 
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
 interface SplitScreenAnalyzerProps {
   initialText?: string;
   initialResult?: any;
@@ -165,6 +205,126 @@ interface ContractDoc {
   statusMessage?: string;
 }
 
+interface ChatMessage {
+  role: "user" | "ai";
+  content: string;
+}
+
+// ─────────────────────────────────────────────
+// B. Animated Radial SVG Aman-O-Meter
+// ─────────────────────────────────────────────
+const AmanOMeter: React.FC<{ score: number }> = ({ score }) => {
+  const [animatedScore, setAnimatedScore] = useState(0);
+
+  useEffect(() => {
+    setAnimatedScore(0);
+    const timer = setTimeout(() => setAnimatedScore(score), 80);
+    return () => clearTimeout(timer);
+  }, [score]);
+
+  const radius = 52;
+  const strokeWidth = 9;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (animatedScore / 100) * circumference;
+
+  const strokeColor =
+    animatedScore >= 80 ? "#006af2" : animatedScore >= 50 ? "#ff9f1c" : "#dc2626";
+  const glowColor =
+    animatedScore >= 80 ? "#3b82f6" : animatedScore >= 50 ? "#ff9f1c" : "#ef4444";
+
+  const gradientId = `gauge-grad-${Math.floor(animatedScore)}`;
+
+  return (
+    <div className="relative flex items-center justify-center" style={{ width: 128, height: 128 }}>
+      <svg width={128} height={128} viewBox="0 0 128 128" style={{ transform: "rotate(-90deg)" }}>
+        <defs>
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={strokeColor} stopOpacity="0.7" />
+            <stop offset="100%" stopColor={glowColor} stopOpacity="1" />
+          </linearGradient>
+          <filter id="gauge-glow">
+            <feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+            <feMerge>
+              <feMergeNode in="coloredBlur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        {/* Track */}
+        <circle
+          cx={64}
+          cy={64}
+          r={radius}
+          fill="none"
+          stroke="#e2e8f0"
+          strokeWidth={strokeWidth}
+        />
+
+        {/* Progress arc */}
+        <circle
+          cx={64}
+          cy={64}
+          r={radius}
+          fill="none"
+          stroke={`url(#${gradientId})`}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          filter="url(#gauge-glow)"
+          style={{
+            transition: "stroke-dashoffset 1.2s cubic-bezier(0.34,1.56,0.64,1)",
+          }}
+        />
+      </svg>
+
+      {/* Centre label */}
+      <div
+        className="absolute inset-0 flex flex-col items-center justify-center"
+        style={{ transform: "rotate(0deg)" }}
+      >
+        <span
+          className="text-2xl font-black leading-none tracking-tighter"
+          style={{ color: strokeColor }}
+        >
+          {animatedScore}
+        </span>
+        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
+          %
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// C. Negotiation Chat Bubble
+// ─────────────────────────────────────────────
+const TypingIndicator = () => (
+  <div className="flex items-end gap-1.5">
+    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#006af2] to-[#0b363b] flex items-center justify-center shrink-0">
+      <Sparkles className="w-3.5 h-3.5 text-white" />
+    </div>
+    <div className="bg-white border border-border-light rounded-2xl rounded-bl-none px-4 py-3 shadow-xs">
+      <div className="flex gap-1 items-center h-4">
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            className="w-1.5 h-1.5 rounded-full bg-electric-blue"
+            style={{
+              animation: `bounce 1.2s ease-in-out ${i * 0.2}s infinite`,
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  </div>
+);
+
+// ─────────────────────────────────────────────
+// Main Component
+// ─────────────────────────────────────────────
 export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
   initialText = "",
   initialResult = null,
@@ -173,20 +333,34 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
   const [docs, setDocs] = useState<ContractDoc[]>([]);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
 
-  const [loading, setLoading] = useState(false); // AI Analysis loading
+  const [loading, setLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [error, setError] = useState<string | null>(null); // Global error
+  const [error, setError] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [showTrialModal, setShowTrialModal] = useState(false);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
   const [showDiff, setShowDiff] = useState<Record<number, boolean>>({});
-  const [showSidebar, setShowSidebar] = useState(false); // Default hidden for cleaner UI
+  const [showSidebar, setShowSidebar] = useState(false);
+
+  // C. Chat state
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const gutterRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize with initial text (history loads) or a default empty file
+  // Auto-scroll chat (local container only, doesn't scroll outer page)
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatMessages, chatLoading]);
+
+  // Initialize
   useEffect(() => {
     if (initialText) {
       const initialDoc: ContractDoc = {
@@ -199,12 +373,7 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
       };
       setDocs([initialDoc]);
       setActiveDocId("initial");
-      // Open sidebar/results if loaded from history
-      if (initialResult) {
-        setShowSidebar(false);
-      }
     } else {
-      // Default empty workspace doc
       const defaultDoc: ContractDoc = {
         id: "doc_default",
         fileName: "draf_kontrak_baru.txt",
@@ -221,6 +390,41 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
 
   const activeDoc = docs.find((d) => d.id === activeDocId) || null;
 
+  // Seed welcome message when result first appears
+  const prevResultRef = useRef<string | null>(null);
+  useEffect(() => {
+    const resultKey = activeDoc?.result ? activeDocId : null;
+    if (resultKey && resultKey !== prevResultRef.current) {
+      prevResultRef.current = resultKey;
+      setChatMessages([
+        {
+          role: "ai",
+          content:
+            "Halo! 👋 Saya sudah menganalisis kontrak ini. Silakan tanyakan kepada saya jika Anda butuh **draf kalimat alternatif** atau **taktik negosiasi** untuk menolak pasal-pasal di atas secara sopan dan profesional!",
+        },
+      ]);
+    }
+  }, [activeDoc?.result, activeDocId]);
+
+  const renderFormattedText = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/\*\*([\s\S]*?)\*\*/g);
+    return parts.map((part, i) => {
+      if (i % 2 === 1) {
+        return <strong key={i} className="font-extrabold text-[#00262b]">{part}</strong>;
+      }
+      const subParts = part.split("\n");
+      return subParts.map((sub, j) => (
+        <React.Fragment key={`${i}-${j}`}>
+          {sub}
+          {j < subParts.length - 1 && <br />}
+        </React.Fragment>
+      ));
+    });
+  };
+
+  // ── Handlers ──────────────────────────────────
+
   const handleScroll = () => {
     if (textareaRef.current && gutterRef.current) {
       gutterRef.current.scrollTop = textareaRef.current.scrollTop;
@@ -231,18 +435,21 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
     if (!activeDocId) return;
     setDocs((prev) =>
       prev.map((d) =>
-        d.id === activeDocId
-          ? { ...d, text: "", result: null, error: null }
-          : d
+        d.id === activeDocId ? { ...d, text: "", result: null, error: null } : d
       )
     );
+    setChatMessages([]);
   };
 
-  const loadSample = () => {
+  // A. Load Sample Contract
+  const loadSampleContract = (key: string) => {
+    const sample = SAMPLE_CONTRACTS[key];
+    if (!sample) return;
+
     const sampleDoc: ContractDoc = {
       id: "doc_sample_" + Math.random().toString(36).substring(2, 7),
-      fileName: "simulasi_kontrak_jebakan.txt",
-      text: SAMPLE_CONTRACT,
+      fileName: sample.fileName,
+      text: sample.text,
       loading: false,
       error: null,
       result: null,
@@ -254,7 +461,11 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
     });
     setActiveDocId(sampleDoc.id);
     setError(null);
+    setChatMessages([]);
   };
+
+  // Legacy
+  const loadSample = () => loadSampleContract("spk_desain");
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -266,7 +477,6 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
   const uploadAndExtractFiles = async (fileList: File[]) => {
     setError(null);
 
-    // Filter valid files
     const invalidFiles = fileList.filter((file) => {
       const ext = file.name.split(".").pop()?.toLowerCase();
       return !["pdf", "docx", "doc", "txt", "png", "jpg", "jpeg", "webp"].includes(ext || "");
@@ -278,20 +488,16 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
     }
 
     const validFiles = fileList;
-
-    // Pisahkan berkas gambar dan berkas dokumen
     const imageFiles = validFiles.filter((file) => {
       const ext = file.name.split(".").pop()?.toLowerCase();
       return ["png", "jpg", "jpeg", "webp"].includes(ext || "");
     });
-
     const docFiles = validFiles.filter((file) => {
       const ext = file.name.split(".").pop()?.toLowerCase();
       return ["pdf", "docx", "doc", "txt"].includes(ext || "");
     });
 
     const newDocsCount = (imageFiles.length > 0 ? 1 : 0) + docFiles.length;
-
     if (docs.length + newDocsCount > 50) {
       setError("Maksimal 50 dokumen yang dapat diunggah dalam satu sesi.");
       return;
@@ -300,10 +506,8 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
     const newDocPlaceholders: ContractDoc[] = [];
     let combinedImgId = "";
 
-    // 1. Placeholder untuk Gambar Gabungan
     if (imageFiles.length > 0) {
       combinedImgId = "doc_combined_img_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-      
       let combinedName = "dokumen_scan_gabungan.txt";
       if (imageFiles.length === 1) {
         const firstBase = imageFiles[0].name.substring(0, imageFiles[0].name.lastIndexOf(".")) || imageFiles[0].name;
@@ -324,7 +528,6 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
       });
     }
 
-    // 2. Placeholder untuk Dokumen Terpisah
     const docPlaceholders: ContractDoc[] = docFiles.map((file) => ({
       id: "doc_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
       fileName: file.name,
@@ -337,23 +540,19 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
 
     newDocPlaceholders.push(...docPlaceholders);
 
-    // Tambahkan semua ke list dokumen
     setDocs((prev) => {
       const filteredPrev = prev.filter((d) => d.id !== "doc_default" || d.text.trim() !== "");
       return [...filteredPrev, ...newDocPlaceholders];
     });
 
-    // Set aktif ke dokumen baru pertama
     if (newDocPlaceholders.length > 0) {
       setActiveDocId(newDocPlaceholders[0].id);
     }
 
-    // Auto-buka sidebar jika jumlah dokumen di workspace > 1
     if (docs.length + newDocPlaceholders.length > 1) {
       setShowSidebar(true);
     }
 
-    // ── PROSES SEKUENSIAL GAMBAR ──
     if (imageFiles.length > 0) {
       (async () => {
         let combinedTextParts: string[] = [];
@@ -361,15 +560,10 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
 
         for (let i = 0; i < imageFiles.length; i++) {
           const file = imageFiles[i];
-
-          // Perbarui status loading per halaman secara real-time
           setDocs((prev) =>
             prev.map((d) =>
               d.id === combinedImgId
-                ? {
-                    ...d,
-                    statusMessage: `Memindai halaman ${i + 1} dari ${imageFiles.length} (${file.name})...`,
-                  }
+                ? { ...d, statusMessage: `Memindai halaman ${i + 1} dari ${imageFiles.length} (${file.name})...` }
                 : d
             )
           );
@@ -378,56 +572,34 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
           try {
             const compressed = await compressImage(file);
             processedFile = compressed as File;
-          } catch (compressErr) {
-            console.warn("Gagal mengompres gambar:", compressErr);
-          }
+          } catch {}
 
           const formData = new FormData();
           formData.append("file", processedFile);
 
           try {
-            const response = await fetchWithRetry("/api/extract", {
-              method: "POST",
-              body: formData,
-            });
-
+            const response = await fetchWithRetry("/api/extract", { method: "POST", body: formData });
             const data = await response.json();
-
-            let textSnippet = data.text || "";
-            let pageHeader = "";
-            if (imageFiles.length > 1) {
-              pageHeader = `\n\n--- HALAMAN ${i + 1}: ${file.name} ---\n`;
-            }
-            combinedTextParts.push(pageHeader + textSnippet);
+            let pageHeader = imageFiles.length > 1 ? `\n\n--- HALAMAN ${i + 1}: ${file.name} ---\n` : "";
+            combinedTextParts.push(pageHeader + (data.text || ""));
           } catch (err: any) {
             encounteredError = true;
             setDocs((prev) =>
               prev.map((d) =>
                 d.id === combinedImgId
-                  ? {
-                      ...d,
-                      loading: false,
-                      error: `Gagal memindai gambar ke-${i + 1} (${file.name}): ${err.message || err}`,
-                      statusMessage: undefined,
-                    }
+                  ? { ...d, loading: false, error: `Gagal memindai gambar ke-${i + 1}: ${err.message || err}`, statusMessage: undefined }
                   : d
               )
             );
-            break; // Stop memproses gambar selanjutnya jika ada satu yang gagal total
+            break;
           }
         }
 
         if (!encounteredError) {
-          const finalText = combinedTextParts.join("\n").trim();
           setDocs((prev) =>
             prev.map((d) =>
               d.id === combinedImgId
-                ? {
-                    ...d,
-                    text: finalText,
-                    loading: false,
-                    statusMessage: undefined,
-                  }
+                ? { ...d, text: combinedTextParts.join("\n").trim(), loading: false, statusMessage: undefined }
                 : d
             )
           );
@@ -435,78 +607,48 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
       })();
     }
 
-    // ── PROSES DOKUMEN LAIN (Parallel/Cepat lokal) ──
     docFiles.forEach(async (file, idx) => {
       const placeholder = docPlaceholders[idx];
-
       const formData = new FormData();
       formData.append("file", file);
-
       try {
-        const response = await fetchWithRetry("/api/extract", {
-          method: "POST",
-          body: formData,
-        });
-
+        const response = await fetchWithRetry("/api/extract", { method: "POST", body: formData });
         const data = await response.json();
-
         setDocs((prev) =>
           prev.map((d) =>
-            d.id === placeholder.id
-              ? { ...d, text: data.text, loading: false, statusMessage: undefined }
-              : d
+            d.id === placeholder.id ? { ...d, text: data.text, loading: false, statusMessage: undefined } : d
           )
         );
       } catch (err: any) {
         setDocs((prev) =>
           prev.map((d) =>
-            d.id === placeholder.id
-              ? { ...d, loading: false, error: err.message || "Gagal memproses file.", statusMessage: undefined }
-              : d
+            d.id === placeholder.id ? { ...d, loading: false, error: err.message || "Gagal memproses file.", statusMessage: undefined } : d
           )
         );
       }
     });
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
+  const handleDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDragging(true); };
   const handleDragLeave = () => setIsDragging(false);
-
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const files = e.dataTransfer.files;
-    if (files && files.length > 0) {
-      await uploadAndExtractFiles(Array.from(files));
-    }
+    if (files && files.length > 0) await uploadAndExtractFiles(Array.from(files));
   };
 
   const handleDeleteDoc = (id: string) => {
     setDocs((prev) => {
       const nextDocs = prev.filter((d) => d.id !== id);
       if (nextDocs.length === 0) {
-        const defaultDoc: ContractDoc = {
-          id: "doc_default",
-          fileName: "draf_kontrak_baru.txt",
-          text: "",
-          loading: false,
-          error: null,
-          result: null,
-        };
+        const defaultDoc: ContractDoc = { id: "doc_default", fileName: "draf_kontrak_baru.txt", text: "", loading: false, error: null, result: null };
         setActiveDocId("doc_default");
         return [defaultDoc];
       }
-      if (activeDocId === id) {
-        setActiveDocId(nextDocs[0].id);
-      }
+      if (activeDocId === id) setActiveDocId(nextDocs[0].id);
       return nextDocs;
     });
   };
@@ -514,9 +656,7 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const text = e.target.value;
     if (!activeDocId) return;
-    setDocs((prev) =>
-      prev.map((d) => (d.id === activeDocId ? { ...d, text } : d))
-    );
+    setDocs((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, text } : d)));
   };
 
   const handleAnalyze = async () => {
@@ -524,48 +664,27 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
       setError("Teks kontrak terlalu pendek. Minimal 50 karakter.");
       return;
     }
-
     const limitCheck = checkCanGenerate();
     if (!limitCheck.allowed) {
-      if (limitCheck.reason === "guest_limit") {
-        setShowTrialModal(true);
-      } else {
-        setShowDailyLimitModal(true);
-      }
+      if (limitCheck.reason === "guest_limit") setShowTrialModal(true);
+      else setShowDailyLimitModal(true);
       return;
     }
-
     setError(null);
     setLoading(true);
-
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contractText: activeDoc.text }),
       });
-
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Gagal menganalisis dokumen.");
-      }
-
-      setDocs((prev) =>
-        prev.map((d) => (d.id === activeDocId ? { ...d, result: data } : d))
-      );
-
+      if (!response.ok) throw new Error(data.error || "Gagal menganalisis dokumen.");
+      setDocs((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, result: data } : d)));
       incrementUsageCount();
-
       if (onAnalysisComplete) {
         const title = activeDoc.fileName || `Analisis Kontrak #${Math.floor(Math.random() * 1000)}`;
-        onAnalysisComplete(
-          title,
-          activeDoc.text,
-          data.skorKeamanan || 0,
-          data.redFlags ? data.redFlags.length : 0,
-          data
-        );
+        onAnalysisComplete(title, activeDoc.text, data.skorKeamanan || 0, data.redFlags ? data.redFlags.length : 0, data);
       }
     } catch (err: any) {
       setError(err.message || "Koneksi ke server bermasalah.");
@@ -580,11 +699,48 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
+  // C. Chat submit
+  const handleChatSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const text = chatInput.trim();
+    if (!text || chatLoading) return;
+    setChatInput("");
+    setChatMessages((prev) => [...prev, { role: "user", content: text }]);
+    setChatLoading(true);
+
+    try {
+      const contextMessages = [
+        {
+          role: "user",
+          content: `Konteks draf kontrak yang sedang dianalisis:\n\n${activeDoc?.text || ""}\n\nHasil analisis AI:\n${JSON.stringify(activeDoc?.result, null, 2)}`,
+        },
+        { role: "model", content: "Saya sudah memahami kontrak dan analisis risiko di atas. Silakan tanyakan apa yang ingin Anda negosiasikan." },
+        ...chatMessages.map((m) => ({ role: m.role === "ai" ? "model" : "user", content: m.content })),
+        { role: "user", content: text },
+      ];
+
+      const response = await fetch("/api/faq-chatbot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: contextMessages }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Gagal mendapatkan respon AI.");
+      setChatMessages((prev) => [...prev, { role: "ai", content: data.reply }]);
+    } catch (err: any) {
+      setChatMessages((prev) => [
+        ...prev,
+        { role: "ai", content: `Maaf, terjadi kendala: ${err.message || "coba lagi."}` },
+      ]);
+    } finally {
+      setChatLoading(false);
+    }
+  };
+
   const handlePrintAnalysisReport = () => {
     if (!activeDoc || !activeDoc.result) return;
     const docName = activeDoc.fileName || "Teks Draf Kontrak";
     const res = activeDoc.result;
-    
     const printWindow = window.open("", "_blank");
     if (printWindow) {
       const redFlagsHtml = res.redFlags && res.redFlags.length > 0
@@ -607,251 +763,64 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
         : "<p class='no-flags'>Tidak ada klausul red flags berbahaya yang terdeteksi.</p>";
 
       const positiveHtml = res.catatanPositif && res.catatanPositif.length > 0
-        ? `<ul class="positive-list">` + 
-          res.catatanPositif.map((pos: string) => `<li>${pos}</li>`).join("") + 
-          `</ul>`
+        ? `<ul class="positive-list">` + res.catatanPositif.map((pos: string) => `<li>${pos}</li>`).join("") + `</ul>`
         : "<p class='no-flags'>Tidak ada catatan khusus.</p>";
 
       printWindow.document.write(`
-        <html>
-        <head>
-          <title>Laporan Red Flags - ${docName}</title>
-          <style>
-            @page {
-              size: A4 portrait;
-              margin: 2.5cm;
-            }
-            body {
-              font-family: 'Times New Roman', Times, serif;
-              line-height: 1.5;
-              color: #00262b;
-              margin: 0;
-              padding: 0;
-            }
-            .header-table {
-              width: 100%;
-              border-collapse: collapse;
-              border-bottom: 2px solid #00262b;
-              margin-bottom: 20px;
-              padding-bottom: 10px;
-            }
-            .title-brand {
-              font-size: 10pt;
-              font-weight: bold;
-              color: #006af2;
-              text-transform: uppercase;
-              letter-spacing: 1px;
-            }
-            .title-report {
-              font-size: 16pt;
-              font-weight: bold;
-              color: #00262b;
-              margin-top: 5px;
-              text-transform: uppercase;
-            }
-            .meta-text {
-              font-size: 10pt;
-              color: #354d51;
-              text-align: right;
-            }
-            .score-section {
-              background: #f4f6f6;
-              border: 1px solid #dcdcdc;
-              border-radius: 8px;
-              padding: 15px;
-              margin-bottom: 25px;
-            }
-            .score-table {
-              width: 100%;
-              border-collapse: collapse;
-            }
-            .score-cell {
-              width: 100px;
-              text-align: center;
-              font-size: 24pt;
-              font-weight: bold;
-              color: #006af2;
-              border-right: 1px solid #dcdcdc;
-              padding-right: 15px;
-              vertical-align: middle;
-            }
-            .score-desc-cell {
-              padding-left: 20px;
-              vertical-align: middle;
-            }
-            .score-status {
-              font-size: 12pt;
-              font-weight: bold;
-              color: #00262b;
-              margin-bottom: 5px;
-            }
-            .score-desc {
-              font-size: 10pt;
-              color: #354d51;
-              margin: 0;
-            }
-            h2 {
-              font-size: 12pt;
-              font-weight: bold;
-              text-transform: uppercase;
-              color: #00262b;
-              border-bottom: 1px solid #00262b;
-              padding-bottom: 4px;
-              margin-top: 25px;
-              margin-bottom: 15px;
-              page-break-after: avoid;
-            }
-            .summary-box {
-              font-size: 11pt;
-              text-align: justify;
-              margin-bottom: 20px;
-            }
-            .flag-card {
-              border: 1px solid #dcdcdc;
-              border-radius: 6px;
-              margin-bottom: 15px;
-              page-break-inside: avoid;
-            }
-            .flag-card.kritis { border-left: 5px solid #8b3911; }
-            .flag-card.sedang { border-left: 5px solid #d97706; }
-            .flag-card.ringan { border-left: 5px solid #006af2; }
-            
-            .flag-header {
-              background: #f8fafc;
-              padding: 8px 12px;
-              font-size: 10pt;
-              font-weight: bold;
-              border-bottom: 1px solid #e2e8f0;
-            }
-            .flag-num {
-              color: #354d51;
-              margin-right: 8px;
-            }
-            .flag-title {
-              color: #00262b;
-            }
-            .badge {
-              font-size: 8pt;
-              font-weight: bold;
-              padding: 2px 8px;
-              border-radius: 4px;
-              text-transform: uppercase;
-              float: right;
-            }
-            .badge.kritis { background: #fee2e2; color: #8b3911; }
-            .badge.sedang { background: #fef3c7; color: #b45309; }
-            .badge.ringan { background: #dbeafe; color: #1d4ed8; }
-            
-            .flag-body {
-              padding: 12px;
-              font-size: 10pt;
-              clear: both;
-            }
-            .flag-body p {
-              margin: 0 0 8px;
-              text-align: justify;
-            }
-            .proposal-box {
-              background: #f0fdf4;
-              border: 1px solid #bbf7d0;
-              border-radius: 4px;
-              padding: 10px;
-              margin-top: 8px;
-            }
-            .proposal-title {
-              font-size: 9pt;
-              color: #15803d;
-              margin: 0 0 4px !important;
-            }
-            .proposal-text {
-              font-family: 'Courier New', Courier, monospace;
-              font-size: 9.5pt;
-              color: #14532d;
-              margin: 0 !important;
-              white-space: pre-wrap;
-              text-align: justify;
-            }
-            .positive-list {
-              font-size: 10pt;
-              padding-left: 20px;
-              margin: 0 0 20px;
-            }
-            .positive-list li {
-              margin-bottom: 6px;
-              text-align: justify;
-            }
-            .no-flags {
-              font-size: 10pt;
-              color: #354d51;
-              font-style: italic;
-            }
-            .footer-disclaimer {
-              margin-top: 40px;
-              font-size: 8pt;
-              color: #94a3b8;
-              text-align: center;
-              border-top: 1px solid #e2e8f0;
-              padding-top: 10px;
-              page-break-inside: avoid;
-            }
-          </style>
-        </head>
-        <body>
-          <table class="header-table">
-            <tr>
-              <td>
-                <div class="title-brand">KONTRAKPINTAR AI</div>
-                <div class="title-report">Laporan Analisis Risiko Hukum</div>
-              </td>
-              <td class="meta-text" style="vertical-align: bottom;">
-                <strong>Dokumen:</strong> ${docName}<br/>
-                <strong>Tanggal:</strong> ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
-              </td>
-            </tr>
-          </table>
-
-          <div class="score-section">
-            <table class="score-table">
-              <tr>
-                <td class="score-cell">${res.skorKeamanan}%</td>
-                <td class="score-desc-cell">
-                  <div class="score-status">
-                    Status Dokumen: ${res.skorKeamanan >= 80 ? "Kontrak Aman & Adil" : res.skorKeamanan >= 50 ? "Butuh Negosiasi Ulang" : "Draf Risiko Tinggi / Bahaya"}
-                  </div>
-                  <p class="score-desc">
-                    Hasil analisis mendeteksi sebanyak <strong>${res.jumlahBahaya} klausul bermasalah</strong> di dalam draf ini. Tinjau rincian red flags dan usulan revisi di bawah untuk menyeimbangkan posisi hukum Anda.
-                  </p>
-                </td>
-              </tr>
-            </table>
-          </div>
-
-          <h2>Ringkasan Eksekutif</h2>
-          <div class="summary-box">${res.ringkasan}</div>
-
-          <h2>Detail Temuan Red Flags (${res.jumlahBahaya})</h2>
-          ${redFlagsHtml}
-
-          <h2>Klausul Positif / Proteksi Terdeteksi</h2>
-          ${positiveHtml}
-
-          <h2>Rekomendasi Tindakan Hukum</h2>
-          <div class="summary-box">${res.rekomendasiUmum}</div>
-
-          <div class="footer-disclaimer">
-            Laporan ini dibuat secara otomatis oleh KontrakPintar AI menggunakan analisis model bahasa kecerdasan buatan. Dokumen ini bertujuan untuk bantuan edukasi kepatuhan draf dan bukan merupakan nasihat hukum formal dari pengacara berlisensi.
-          </div>
-
-          <script>
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-                setTimeout(function() { window.close(); }, 500);
-              }, 250);
-            };
-          </script>
-        </body>
-        </html>
+        <html><head><title>Laporan Red Flags - ${docName}</title>
+        <style>
+          @page { size: A4 portrait; margin: 2.5cm; }
+          body { font-family: 'Times New Roman', Times, serif; line-height: 1.5; color: #00262b; margin: 0; padding: 0; }
+          .header-table { width: 100%; border-collapse: collapse; border-bottom: 2px solid #00262b; margin-bottom: 20px; padding-bottom: 10px; }
+          .title-brand { font-size: 10pt; font-weight: bold; color: #006af2; text-transform: uppercase; letter-spacing: 1px; }
+          .title-report { font-size: 16pt; font-weight: bold; color: #00262b; margin-top: 5px; text-transform: uppercase; }
+          .meta-text { font-size: 10pt; color: #354d51; text-align: right; }
+          .score-section { background: #f4f6f6; border: 1px solid #dcdcdc; border-radius: 8px; padding: 15px; margin-bottom: 25px; }
+          .score-table { width: 100%; border-collapse: collapse; }
+          .score-cell { width: 100px; text-align: center; font-size: 24pt; font-weight: bold; color: #006af2; border-right: 1px solid #dcdcdc; padding-right: 15px; vertical-align: middle; }
+          .score-desc-cell { padding-left: 20px; vertical-align: middle; }
+          .score-status { font-size: 12pt; font-weight: bold; color: #00262b; margin-bottom: 5px; }
+          .score-desc { font-size: 10pt; color: #354d51; margin: 0; }
+          h2 { font-size: 12pt; font-weight: bold; text-transform: uppercase; color: #00262b; border-bottom: 1px solid #00262b; padding-bottom: 4px; margin-top: 25px; margin-bottom: 15px; page-break-after: avoid; }
+          .summary-box { font-size: 11pt; text-align: justify; margin-bottom: 20px; }
+          .flag-card { border: 1px solid #dcdcdc; border-radius: 6px; margin-bottom: 15px; page-break-inside: avoid; }
+          .flag-card.kritis { border-left: 5px solid #8b3911; }
+          .flag-card.sedang { border-left: 5px solid #d97706; }
+          .flag-card.ringan { border-left: 5px solid #006af2; }
+          .flag-header { background: #f8fafc; padding: 8px 12px; font-size: 10pt; font-weight: bold; border-bottom: 1px solid #e2e8f0; }
+          .flag-num { color: #354d51; margin-right: 8px; }
+          .badge { font-size: 8pt; font-weight: bold; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; float: right; }
+          .badge.kritis { background: #fee2e2; color: #8b3911; }
+          .badge.sedang { background: #fef3c7; color: #b45309; }
+          .badge.ringan { background: #dbeafe; color: #1d4ed8; }
+          .flag-body { padding: 12px; font-size: 10pt; clear: both; }
+          .flag-body p { margin: 0 0 8px; text-align: justify; }
+          .proposal-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 10px; margin-top: 8px; }
+          .proposal-title { font-size: 9pt; color: #15803d; margin: 0 0 4px !important; }
+          .proposal-text { font-family: 'Courier New', monospace; font-size: 9.5pt; color: #14532d; margin: 0 !important; white-space: pre-wrap; text-align: justify; }
+          .positive-list { font-size: 10pt; padding-left: 20px; margin: 0 0 20px; }
+          .positive-list li { margin-bottom: 6px; text-align: justify; }
+          .no-flags { font-size: 10pt; color: #354d51; font-style: italic; }
+          .footer-disclaimer { margin-top: 40px; font-size: 8pt; color: #94a3b8; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+        </style></head><body>
+        <table class="header-table"><tr>
+          <td><div class="title-brand">KONTRAKPINTAR AI</div><div class="title-report">Laporan Analisis Risiko Hukum</div></td>
+          <td class="meta-text" style="vertical-align:bottom;"><strong>Dokumen:</strong> ${docName}<br/><strong>Tanggal:</strong> ${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</td>
+        </tr></table>
+        <div class="score-section"><table class="score-table"><tr>
+          <td class="score-cell">${res.skorKeamanan}%</td>
+          <td class="score-desc-cell">
+            <div class="score-status">Status: ${res.skorKeamanan >= 80 ? "Kontrak Aman & Adil" : res.skorKeamanan >= 50 ? "Butuh Negosiasi Ulang" : "Draf Risiko Tinggi / Bahaya"}</div>
+            <p class="score-desc">Hasil analisis mendeteksi sebanyak <strong>${res.jumlahBahaya} klausul bermasalah</strong>. Tinjau rincian di bawah.</p>
+          </td>
+        </tr></table></div>
+        <h2>Ringkasan Eksekutif</h2><div class="summary-box">${res.ringkasan}</div>
+        <h2>Detail Temuan Red Flags (${res.jumlahBahaya})</h2>${redFlagsHtml}
+        <h2>Klausul Positif / Proteksi Terdeteksi</h2>${positiveHtml}
+        <h2>Rekomendasi Tindakan Hukum</h2><div class="summary-box">${res.rekomendasiUmum}</div>
+        <div class="footer-disclaimer">Laporan ini dibuat otomatis oleh KontrakPintar AI. Bukan merupakan nasihat hukum formal dari pengacara berlisensi.</div>
+        <script>window.onload=function(){setTimeout(function(){window.print();setTimeout(function(){window.close();},500);},250);};</script>
+        </body></html>
       `);
       printWindow.document.close();
     }
@@ -864,17 +833,14 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
   const lines = activeDoc ? activeDoc.text.split("\n") : [];
   const lineCount = Math.max(16, lines.length);
 
-  // Aman-O-Meter SVG Calculation
-  const radius = 48;
-  const circumference = 2 * Math.PI * radius;
+  // B. Score for Aman-O-Meter
   const scoreRaw = activeDoc?.result ? (activeDoc.result.skorKeamanan ?? (activeDoc.result as any).score) : undefined;
   const scoreVal = typeof scoreRaw === "number" && !isNaN(scoreRaw)
-    ? scoreRaw 
-    : (activeDoc?.result 
-        ? Math.max(0, Math.min(100, Math.round((1 - (activeDoc.result.jumlahBahaya || 0) / (activeDoc.result.totalPasal || 1)) * 100)))
-        : 0);
+    ? scoreRaw
+    : activeDoc?.result
+    ? Math.max(0, Math.min(100, Math.round((1 - (activeDoc.result.jumlahBahaya || 0) / (activeDoc.result.totalPasal || 1)) * 100)))
+    : 0;
   const score = isNaN(scoreVal) ? 0 : scoreVal;
-  const strokeDashoffset = circumference - (score / 100) * circumference;
 
   const getSeverityColor = (s: string) => {
     if (s === "kritis") return { border: "var(--color-amber-pop)", bg: "#fff9f7" };
@@ -891,7 +857,15 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
   const hasResult = activeDoc && activeDoc.result;
 
   return (
-    <div className="w-full flex flex-col lg:flex-row gap-6 max-w-7xl mx-auto items-stretch h-full min-h-0">
+    <div className="w-full flex flex-col lg:flex-row gap-4 max-w-7xl mx-auto items-stretch h-full min-h-0">
+      {/* Bounce animation for typing dots */}
+      <style>{`
+        @keyframes bounce {
+          0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+          40% { transform: translateY(-6px); opacity: 1; }
+        }
+      `}</style>
+
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -902,9 +876,9 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
         onChange={handleFileChange}
       />
 
-      {/* 1. BILAH SISI DAFTAR DOKUMEN (WORKSPACE SIDEBAR) - Collapsible */}
+      {/* ── 1. SIDEBAR ── */}
       {showSidebar && (
-        <div className="w-full lg:w-56 bg-white rounded-xl border border-border-light p-4 flex flex-col gap-3 shrink-0 lg:h-full shadow-xs animate-fade-in">
+        <div className="w-full lg:w-52 bg-white rounded-xl border border-border-light p-4 flex flex-col gap-3 shrink-0 lg:h-full shadow-xs animate-fade-in">
           <div className="flex items-center justify-between border-b border-border-light pb-2.5">
             <span className="text-xs font-bold text-midnight-ink uppercase tracking-wide">
               Berkas ({docs.length}/50)
@@ -924,9 +898,7 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
               return (
                 <div
                   key={doc.id}
-                  onClick={() => {
-                    if (!doc.loading) setActiveDocId(doc.id);
-                  }}
+                  onClick={() => { if (!doc.loading) setActiveDocId(doc.id); }}
                   className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer border transition-all ${
                     isActive
                       ? "bg-[#00262b] border-[#00262b] text-white"
@@ -937,19 +909,14 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
                     {doc.loading ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-electric-blue shrink-0" />
                     ) : doc.result ? (
-                      <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-spring-leaf" : "text-[#1d6b2a]"}`} />
+                      <CheckCircle className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-spring-leaf" : "text-amber-600"}`} />
                     ) : (
                       <FileText className="w-3.5 h-3.5 opacity-60 shrink-0" />
                     )}
-                    <span className="text-xs font-semibold truncate pr-1">
-                      {doc.fileName}
-                    </span>
+                    <span className="text-xs font-semibold truncate pr-1">{doc.fileName}</span>
                   </div>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteDoc(doc.id);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); handleDeleteDoc(doc.id); }}
                     className={`p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer border-0 bg-transparent ${
                       isActive ? "text-white/60 hover:text-white hover:bg-white/10" : "text-slate-grille hover:text-amber-pop hover:bg-fog-gray"
                     }`}
@@ -972,32 +939,48 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
         </div>
       )}
 
-      {/* 2. AREA EDITOR (Lebar penuh jika tidak ada hasil analisis) */}
+      {/* ── 2. EDITOR PANEL ── */}
       <div className="flex-1 flex flex-col min-w-0 lg:h-full min-h-0 overflow-hidden">
+        {/* A. Friction-Reducer: Sample Contract Buttons */}
+        <div className="flex items-center gap-2 mb-2 shrink-0 flex-wrap">
+          <span className="text-[10px] font-bold text-slate-grille uppercase tracking-wider whitespace-nowrap">
+            Coba Contoh:
+          </span>
+          {Object.entries(SAMPLE_CONTRACTS).map(([key, s]) => (
+            <button
+              key={key}
+              onClick={() => loadSampleContract(key)}
+              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#00262b] bg-white border border-[#00262b]/20 hover:bg-[#ff9f1c]/30 hover:border-[#ff9f1c] px-3.5 py-1.5 rounded-full transition-all active:scale-95 cursor-pointer whitespace-nowrap shadow-xs"
+            >
+              <BookOpen className="w-3 h-3 text-electric-blue" />
+              {s.label}
+            </button>
+          ))}
+        </div>
+
         <div
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={`flex-1 flex flex-col bg-white rounded-xl border overflow-hidden transition-colors min-h-0 ${
             isDragging
-              ? "border-electric-blue shadow-focus-blue"
+              ? "border-electric-blue shadow-[0_0_0_3px_rgba(0,106,242,0.15)]"
               : "border-border-light shadow-sm"
           }`}
         >
           {/* Editor Top Bar */}
           <div className="flex items-center justify-between bg-fog-gray border-b border-border-light px-4 py-2.5 shrink-0">
             <div className="flex items-center gap-2">
-              {/* Sidebar toggle button */}
               <button
-                onClick={() => setShowSidebar(p => !p)}
+                onClick={() => setShowSidebar((p) => !p)}
                 className={`p-1.5 rounded transition cursor-pointer border-0 bg-transparent ${
-                  showSidebar 
-                    ? "bg-[#00262b] text-white hover:bg-[#0b363b]" 
+                  showSidebar
+                    ? "bg-[#00262b] text-white hover:bg-[#0b363b]"
                     : "text-slate-grille hover:text-midnight-ink hover:bg-border-light"
                 }`}
                 title={showSidebar ? "Sembunyikan daftar berkas" : "Tampilkan daftar berkas"}
               >
-                <FolderOpen className="w-4 h-4" />
+                <PanelLeft className="w-4 h-4" />
               </button>
               <span className="text-xs font-mono text-slate-grille truncate max-w-[160px] ml-1">
                 {activeDoc?.fileName || "draf_kontrak.txt"}
@@ -1006,21 +989,15 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1 text-xs font-medium text-slate-grille bg-white border border-border-light hover:bg-fog-gray px-2.5 py-1 rounded transition active:scale-95 cursor-pointer"
+                className="flex items-center gap-1 text-xs font-medium text-slate-grille bg-white border border-border-light hover:bg-fog-gray px-2.5 py-1 rounded-full transition active:scale-95 cursor-pointer"
               >
                 <Upload className="w-3.5 h-3.5" />
-                Unggah Berkas
-              </button>
-              <button
-                onClick={loadSample}
-                className="text-xs font-medium text-white bg-[#00262b] hover:bg-[#0b363b] px-2.5 py-1 rounded transition active:scale-95 cursor-pointer"
-              >
-                Demo Kontrak
+                Unggah
               </button>
               {activeDoc && activeDoc.text && (
                 <button
                   onClick={handleClear}
-                  className="p-1 text-slate-grille hover:text-amber-pop hover:bg-fog-gray rounded transition cursor-pointer border-0 bg-transparent"
+                  className="p-1 text-slate-grille hover:text-amber-pop hover:bg-fog-gray rounded-full transition cursor-pointer border-0 bg-transparent"
                   title="Kosongkan naskah"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
@@ -1037,11 +1014,6 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
                 <p className="text-xs font-semibold text-midnight-ink max-w-sm leading-relaxed animate-pulse">
                   {activeDoc.statusMessage || "Mengekstrak teks dokumen (menggunakan OCR AI)..."}
                 </p>
-                {activeDoc.statusMessage && activeDoc.statusMessage.includes("Halaman") && (
-                  <p className="text-[10px] text-slate-grille max-w-xs leading-normal">
-                    Proses pemindaian gambar berjalan secara berurutan untuk menjaga keandalan ekstraksi teks. Mohon tunggu sebentar.
-                  </p>
-                )}
               </div>
             )}
 
@@ -1050,14 +1022,17 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
                 onClick={() => fileInputRef.current?.click()}
                 className="absolute inset-0 flex flex-col items-center justify-center text-center p-8 cursor-pointer hover:bg-fog-gray/40 transition z-10 animate-fade-in"
               >
-                <div className="w-12 h-12 rounded-xl border-2 border-dashed border-border-medium flex items-center justify-center text-slate-grille mb-4">
-                  <FileUp className="w-6 h-6" />
+                <div className="w-14 h-14 rounded-2xl border-2 border-dashed border-border-medium flex items-center justify-center text-slate-grille mb-4">
+                  <UploadCloud className="w-7 h-7" />
                 </div>
-                <p className="text-sm font-semibold text-midnight-ink mb-1">
-                  Seret & Lepas Berkas atau Gambar di Sini
+                <p className="text-sm font-bold text-midnight-ink tracking-tight mb-1">
+                  Seret &amp; Lepas Berkas atau Gambar
                 </p>
-                <p className="text-xs text-slate-grille max-w-[280px] leading-relaxed">
-                  Format PDF, Word (.docx, .doc), Teks (.txt), atau Gambar (.png, .jpg, .jpeg, .webp) untuk dipindai OCR.
+                <p className="text-xs text-slate-grille max-w-[260px] leading-relaxed">
+                  PDF, Word (.docx), Teks (.txt), atau Gambar (.png/.jpg) untuk dipindai OCR
+                </p>
+                <p className="text-[10px] text-slate-grille/60 mt-3">
+                  — atau gunakan tombol <strong>Coba Contoh</strong> di atas —
                 </p>
               </div>
             )}
@@ -1069,9 +1044,7 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
               style={{ color: "var(--color-slate-grille)", opacity: 0.5 }}
             >
               {Array.from({ length: lineCount }).map((_, i) => (
-                <div key={i} className="h-5">
-                  {i + 1}
-                </div>
+                <div key={i} className="h-5">{i + 1}</div>
               ))}
             </div>
 
@@ -1089,17 +1062,15 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
 
           {/* Editor Footer */}
           <div className="flex items-center justify-between bg-fog-gray border-t border-border-light px-4 py-2 text-[10px] font-mono text-slate-grille shrink-0">
-            <span>
-              {(activeDoc ? activeDoc.text.length : 0).toLocaleString()} / 50.000 karakter
-            </span>
+            <span>{(activeDoc ? activeDoc.text.length : 0).toLocaleString()} / 50.000 karakter</span>
             <span className="flex items-center gap-1 text-electric-blue font-semibold">
-              <Eye className="w-3 h-3" />
+              <ScanLine className="w-3 h-3" />
               Scanner Multimodal
             </span>
           </div>
         </div>
 
-        {/* Action Button — always visible at the bottom, never scrolled away */}
+        {/* Action Buttons */}
         <div className="shrink-0 mt-3 flex flex-col gap-2">
           {activeDoc?.error && (
             <div className="flex items-start gap-2 p-3 bg-warm-mist border border-amber-pop/20 rounded-lg text-xs text-amber-pop animate-fade-up">
@@ -1117,81 +1088,86 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
             onClick={handleAnalyze}
             loading={loading}
             disabled={!activeDoc?.text.trim() || activeDoc.text.trim().length < 50 || activeDoc.loading}
-            className="w-full py-3 text-sm font-semibold"
+            className="w-full py-3 text-sm font-bold rounded-full"
           >
             <Sparkles className="w-4 h-4" />
-            Mulai Analisis AI
+            Analisis Sekarang
           </Button>
         </div>
       </div>
 
-      {/* 3. AREA KANAN: PANEL HASIL AI (Hanya tampil ketika ada hasil analisis) */}
+      {/* ── 3. RESULTS PANEL ── */}
       {hasResult && activeDoc?.result && (
-        <div className="w-full lg:w-[500px] xl:w-[540px] flex flex-col gap-4 overflow-y-auto custom-scrollbar shrink-0 animate-fade-in pb-6 pr-1.5 lg:h-full">
-
+        <div className="w-full lg:w-[480px] xl:w-[520px] flex flex-col h-full min-h-0 shrink-0 animate-fade-in pb-6">
           {/* Panel Header */}
-          <div className="flex items-center justify-between bg-white rounded-xl border border-border-light px-4 py-3 shadow-xs shrink-0">
+          <div className="flex items-center justify-between bg-white rounded-xl border border-border-light px-4 py-3 shadow-xs shrink-0 mb-4">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-electric-blue animate-pulse" />
               <span className="text-xs font-bold text-midnight-ink uppercase tracking-wide">Hasil Analisis AI</span>
             </div>
             <button
               onClick={handlePrintAnalysisReport}
-              className="inline-flex items-center gap-1.5 text-[10px] font-bold text-electric-blue border border-electric-blue/30 hover:bg-electric-blue/5 px-3 py-1.5 rounded-lg transition-all uppercase tracking-wider cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-[10px] font-bold text-electric-blue border border-electric-blue/30 hover:bg-electric-blue/5 px-3 py-1.5 rounded-full transition-all uppercase tracking-wider cursor-pointer"
             >
               <Printer className="w-3 h-3" />
-              Cetak Laporan
+              Cetak
             </button>
           </div>
 
-          {/* 1. Aman-O-Meter — Hero Card */}
-          <div
-            className={`rounded-xl border border-border-light overflow-hidden shadow-xs p-4 shrink-0 ${
-              score >= 80
-                ? "bg-gradient-to-br from-[#f0fff4] to-[#dcfce7] border-green-200"
-                : score >= 50
-                ? "bg-gradient-to-br from-[#fffbeb] to-[#fef3c7] border-amber-200"
-                : "bg-gradient-to-br from-[#fff8f5] to-[#ffece3] border-red-200"
-            }`}
-          >
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                {/* Big Percent Circle */}
-                <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center shadow-xs border border-border-light shrink-0">
-                  <span className="text-xl font-black text-electric-blue tracking-tighter">
-                    {score}%
-                  </span>
-                </div>
-                <div>
-                  <h4 className="text-[10px] font-bold text-slate-grille uppercase tracking-wider mb-1">Keamanan Kontrak</h4>
+          {/* Scrollable Content Container */}
+          <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col gap-4 pr-1 min-h-0">
+            {/* B. Radial SVG Aman-O-Meter — Hero Card */}
+            <div
+              className={`rounded-xl border overflow-hidden shadow-xs shrink-0 ${
+                score >= 80
+                  ? "bg-gradient-to-br from-[#f0f6ff] to-[#dbeafe] border-blue-200"
+                  : score >= 50
+                  ? "bg-gradient-to-br from-[#fffbeb] to-[#fef3c7] border-amber-200"
+                  : "bg-gradient-to-br from-[#fff8f5] to-[#ffece3] border-red-200"
+              }`}
+            >
+              <div className="flex items-center gap-4 p-4">
+                {/* Animated Radial Gauge */}
+                <AmanOMeter score={score} />
+
+                {/* Score details */}
+                <div className="flex-1">
+                  <p className="text-[10px] font-bold text-slate-grille uppercase tracking-widest mb-1">Aman-O-Meter</p>
                   <div
-                    className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                    className={`inline-flex items-center gap-1.5 text-xs font-extrabold px-3 py-1 rounded-full mb-2 ${
                       score >= 80
-                        ? "bg-[#1d6b2a]/10 text-[#1d6b2a]"
+                        ? "bg-blue-700/10 text-blue-800"
                         : score >= 50
-                        ? "bg-amber-800/10 text-amber-800"
-                        : "bg-red-800/10 text-red-700"
+                        ? "bg-amber-700/10 text-amber-800"
+                        : "bg-red-700/10 text-red-700"
                     }`}
                   >
-                    {score >= 80 ? (
-                      <><CheckCircle className="w-3 h-3" /> Aman &amp; Adil</>
-                    ) : score >= 50 ? (
-                      <><Info className="w-3 h-3" /> Butuh Negosiasi</>
-                    ) : (
-                      <><AlertTriangle className="w-3 h-3" /> Draf Rawan</>
-                    )}
+                  {score >= 80 ? (
+                    <><ShieldCheck className="w-3.5 h-3.5" /> Aman &amp; Adil</>
+                  ) : score >= 50 ? (
+                    <><Scale className="w-3.5 h-3.5" /> Butuh Negosiasi</>
+                  ) : (
+                    <><Flag className="w-3.5 h-3.5" /> Draf Rawan</>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 mt-1">
+                  <div>
+                    <p className="text-[9px] text-slate-grille font-bold uppercase tracking-wider">Red Flags</p>
+                    <p className="text-lg font-black text-midnight-ink tracking-tight leading-none">{activeDoc.result.jumlahBahaya}</p>
+                  </div>
+                  <div className="w-px h-8 bg-border-light" />
+                  <div>
+                    <p className="text-[9px] text-slate-grille font-bold uppercase tracking-wider">Skor Keamanan</p>
+                    <p className="text-lg font-black tracking-tight leading-none" style={{ color: score >= 80 ? "#006af2" : score >= 50 ? "#ff9f1c" : "#dc2626" }}>
+                      {score}%
+                    </p>
                   </div>
                 </div>
-              </div>
-
-              <div className="text-right shrink-0">
-                <p className="text-[9px] text-slate-grille font-bold uppercase tracking-wider mb-0.5">Red Flags</p>
-                <p className="text-xs font-black text-midnight-ink uppercase">{activeDoc.result.jumlahBahaya} Temuan</p>
               </div>
             </div>
           </div>
 
-          {/* 2. Ringkasan Analisis */}
+          {/* Ringkasan */}
           <div className="bg-white rounded-xl border border-border-light p-5 shadow-xs shrink-0">
             <p className="text-[10px] font-bold text-slate-grille uppercase tracking-widest mb-3">Ringkasan Analisis</p>
             <div className="text-[13px] text-slate-grille leading-relaxed">
@@ -1199,11 +1175,11 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
             </div>
           </div>
 
-          {/* 3. Red Flags */}
+          {/* Red Flags */}
           {activeDoc.result.redFlags && activeDoc.result.redFlags.length > 0 && (
             <div className="flex flex-col gap-3 shrink-0">
               <div className="flex items-center gap-2">
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-pop" />
+                <Flag className="w-3.5 h-3.5 text-amber-pop" />
                 <p className="text-[10px] font-bold text-amber-pop uppercase tracking-widest">
                   {activeDoc.result.jumlahBahaya} Red Flags Ditemukan
                 </p>
@@ -1211,30 +1187,22 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
               {activeDoc.result.redFlags.map((flag, idx) => {
                 const color = getSeverityColor(flag.tingkatKeparahan);
                 const isDiffOpen = !!showDiff[idx];
-
                 return (
                   <div
                     key={idx}
                     className="bg-white rounded-xl border border-border-light overflow-hidden shadow-xs"
                     style={{ borderLeftWidth: "4px", borderLeftColor: color.border }}
                   >
-                    {/* Red Flag Header */}
                     <div className="px-5 py-3 border-b border-border-light flex items-center justify-between bg-fog-gray/30">
                       <span className="text-xs font-bold text-midnight-ink bg-white px-2.5 py-1 rounded-md border border-border-light">
                         {flag.pasalRef || `Klausul ${idx + 1}`}
                       </span>
-                      <span
-                        className={`text-[9px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full border ${getSeverityBadge(
-                          flag.tingkatKeparahan
-                        )}`}
-                      >
+                      <span className={`text-[9px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full border ${getSeverityBadge(flag.tingkatKeparahan)}`}>
                         {flag.tingkatKeparahan}
                       </span>
                     </div>
 
-                    {/* Content Area */}
                     <div className="px-5 py-4 space-y-4">
-                      {/* Why Dangerous */}
                       <div>
                         <p className="text-[9px] font-bold text-slate-grille uppercase tracking-widest mb-2">Analisis Potensi Risiko</p>
                         <div className="text-[13px] text-slate-grille leading-relaxed">
@@ -1242,21 +1210,16 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
                         </div>
                       </div>
 
-                      {/* Interactive Visual Diff Viewer */}
                       {isDiffOpen ? (
                         <div className="space-y-2.5 animate-fade-up">
                           <p className="text-[9px] font-bold text-slate-grille uppercase tracking-widest">Perbandingan Visual (Diff)</p>
                           <div className="rounded-xl overflow-hidden border border-border-light text-[11px] font-mono leading-relaxed divide-y divide-border-light">
                             <div className="bg-red-50 text-red-700 p-3.5 relative">
-                              <span className="absolute top-2.5 right-2.5 text-[9px] font-bold text-red-800 bg-red-200 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                Pasal Asli
-                              </span>
+                              <span className="absolute top-2.5 right-2.5 text-[9px] font-bold text-red-800 bg-red-200 px-1.5 py-0.5 rounded uppercase tracking-wider">Pasal Asli</span>
                               <span className="line-through block pr-16 leading-relaxed">{flag.kutipanAsli}</span>
                             </div>
                             <div className="bg-green-50 text-green-800 p-3.5 relative">
-                              <span className="absolute top-2.5 right-2.5 text-[9px] font-bold text-green-800 bg-green-200 px-1.5 py-0.5 rounded uppercase tracking-wider">
-                                Usulan Revisi
-                              </span>
+                              <span className="absolute top-2.5 right-2.5 text-[9px] font-bold text-green-800 bg-green-200 px-1.5 py-0.5 rounded uppercase tracking-wider">Usulan Revisi</span>
                               <span className="font-semibold block pr-20 leading-relaxed">{flag.usulanRevisi}</span>
                             </div>
                           </div>
@@ -1273,33 +1236,32 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
                             </blockquote>
                           </div>
                           <div>
-                            <p className="text-[9px] font-bold text-[#195e24] uppercase tracking-widest mb-2">Usulan Revisi AI</p>
-                            <p className="text-[12px] text-green-900 font-semibold bg-pale-mint/40 border border-spring-leaf/25 rounded-xl px-4 py-3 leading-relaxed">
+                            <p className="text-[9px] font-bold text-amber-800 uppercase tracking-widest mb-2">Usulan Revisi AI</p>
+                            <p className="text-[12px] text-amber-900 font-semibold bg-pale-mint/40 border border-spring-leaf/25 rounded-xl px-4 py-3 leading-relaxed">
                               {flag.usulanRevisi}
                             </p>
                           </div>
                         </div>
                       )}
 
-                      {/* Card Toolbar */}
                       <div className="flex items-center justify-end gap-2 pt-3 border-t border-border-light">
                         <button
                           onClick={() => toggleDiff(idx)}
-                          className={`btn-outline text-[11px] py-2 px-3.5 flex items-center gap-1.5 transition active:scale-95 cursor-pointer ${
+                          className={`btn-outline text-[11px] py-2 px-3.5 flex items-center gap-1.5 transition active:scale-95 cursor-pointer rounded-full ${
                             isDiffOpen ? "bg-[#00262b] text-white border-[#00262b] hover:bg-[#0b363b]" : ""
                           }`}
                         >
-                          <GitCompare className="w-3.5 h-3.5" />
-                          {isDiffOpen ? "Tutup Perbandingan" : "Bandingkan Teks"}
+                          <ArrowLeftRight className="w-3.5 h-3.5" />
+                          {isDiffOpen ? "Tutup" : "Bandingkan"}
                         </button>
                         <button
                           onClick={() => handleCopyRevision(flag.usulanRevisi, idx)}
-                          className="btn-outline text-[11px] py-2 px-3.5 flex items-center gap-1.5 active:scale-95 cursor-pointer"
+                          className="btn-outline text-[11px] py-2 px-3.5 flex items-center gap-1.5 active:scale-95 cursor-pointer rounded-full"
                         >
                           {copiedIndex === idx ? (
-                            <><Check className="w-3 h-3 text-green-600" /> Tersalin</>
+                            <><Check className="w-3 h-3 text-amber-600" /> Tersalin</>
                           ) : (
-                            <><Copy className="w-3.5 h-3.5" /> Salin Usulan</>
+                            <><Copy className="w-3.5 h-3.5" /> Salin</>
                           )}
                         </button>
                       </div>
@@ -1310,17 +1272,17 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
             </div>
           )}
 
-          {/* 4. Hal Positif */}
+          {/* Hal Positif */}
           {activeDoc.result.catatanPositif && activeDoc.result.catatanPositif.length > 0 && (
             <div className="bg-pale-mint/25 border border-spring-leaf/30 rounded-xl p-5 shrink-0">
               <div className="flex items-center gap-2 mb-3">
-                <CheckCircle className="w-3.5 h-3.5 text-[#1d6b2a]" />
-                <p className="text-[10px] font-bold text-[#1d6b2a] uppercase tracking-widest">Pasal Adil &amp; Seimbang</p>
+                <CheckCircle className="w-3.5 h-3.5 text-spring-leaf" />
+                <p className="text-[10px] font-bold text-midnight-ink uppercase tracking-widest">Pasal Adil &amp; Seimbang</p>
               </div>
               <ul className="space-y-2.5">
                 {activeDoc.result.catatanPositif.map((pos, idx) => (
-                  <li key={idx} className="flex items-start gap-2.5 text-[13px] text-green-950 leading-relaxed">
-                    <CheckCircle className="w-4 h-4 text-[#1d6b2a] shrink-0 mt-0.5" />
+                  <li key={idx} className="flex items-start gap-2.5 text-[13px] text-slate-700 leading-relaxed">
+                    <CheckCircle className="w-4 h-4 text-spring-leaf shrink-0 mt-0.5" />
                     <span>{pos}</span>
                   </li>
                 ))}
@@ -1328,7 +1290,7 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
             </div>
           )}
 
-          {/* 5. Rekomendasi Utama */}
+          {/* Rekomendasi Utama */}
           <div className="bg-white border border-border-light border-l-[4px] border-l-electric-blue rounded-xl p-5 shadow-xs shrink-0">
             <div className="flex items-center gap-2 mb-3">
               <Sparkles className="w-3.5 h-3.5 text-electric-blue" />
@@ -1338,7 +1300,77 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
               <GlossaryWrapper text={activeDoc.result.rekomendasiUmum} />
             </div>
           </div>
+
+          {/* ── C. NEGOTIATION CHAT ── */}
+          <div className="bg-white rounded-xl border border-border-light overflow-hidden shadow-xs shrink-0">
+            {/* Chat Header */}
+            <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border-light bg-gradient-to-r from-[#00262b] to-[#0b363b]">
+              <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center">
+                <Bot className="w-3.5 h-3.5 text-[#ff9f1c]" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-white tracking-tight">Negosiasi Playground</p>
+                <p className="text-[9px] text-white/60 tracking-wide">Tanya AI tentang kontrak ini</p>
+              </div>
+              <div className="ml-auto flex items-center gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#ff9f1c] animate-pulse" />
+                <span className="text-[9px] text-[#ff9f1c] font-bold">Online</span>
+              </div>
+            </div>
+
+            {/* Chat messages */}
+            <div ref={chatContainerRef} className="flex flex-col gap-3 p-4 max-h-64 overflow-y-auto custom-scrollbar bg-[#f8fafc]">
+              {chatMessages.map((msg, i) => (
+                <div
+                  key={i}
+                  className={`flex items-end gap-2 ${msg.role === "user" ? "flex-row-reverse" : ""} animate-fade-up`}
+                >
+                  {msg.role === "ai" && (
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#006af2] to-[#0b363b] flex items-center justify-center shrink-0">
+                      <Sparkles className="w-3.5 h-3.5 text-white" />
+                    </div>
+                  )}
+                  <div
+                    className={`max-w-[80%] px-3.5 py-2.5 text-[12px] leading-relaxed ${
+                      msg.role === "user"
+                        ? "bg-[#00262b] text-white rounded-2xl rounded-br-none"
+                        : "bg-white text-midnight-ink rounded-2xl rounded-bl-none border border-border-light shadow-xs"
+                    }`}
+                  >
+                    {renderFormattedText(msg.content)}
+                  </div>
+                </div>
+              ))}
+
+              {chatLoading && <TypingIndicator />}
+            </div>
+
+            {/* Chat Input */}
+            <form
+              onSubmit={handleChatSubmit}
+              className="flex items-center gap-2 px-3 py-3 border-t border-border-light bg-white"
+            >
+              <input
+                ref={chatInputRef}
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="Tanya soal negosiasi pasal ini..."
+                className="flex-1 text-xs text-midnight-ink bg-fog-gray border border-border-light rounded-full px-4 py-2.5 focus:outline-none focus:border-electric-blue/50 focus:ring-2 focus:ring-electric-blue/10 transition placeholder-slate-grille/70"
+                disabled={chatLoading}
+              />
+              <button
+                type="submit"
+                disabled={!chatInput.trim() || chatLoading}
+                className="w-9 h-9 rounded-full bg-[#00262b] hover:bg-[#0b363b] text-white flex items-center justify-center shrink-0 transition active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+              </button>
+            </form>
+          </div>
+
         </div>
+      </div>
       )}
 
       {/* Trial modal */}
@@ -1355,22 +1387,13 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
               </p>
             </div>
             <div className="flex flex-col gap-2 pt-2">
-              <Link
-                href="/login?redirect=/dashboard?tab=analyzer"
-                className="btn-primary w-full h-10 flex items-center justify-center text-xs font-bold"
-              >
+              <Link href="/login?redirect=/dashboard?tab=analyzer" className="btn-primary w-full h-10 flex items-center justify-center text-xs font-bold">
                 Daftar Akun Baru
               </Link>
-              <Link
-                href="/login?redirect=/dashboard?tab=analyzer"
-                className="btn-outline w-full h-10 flex items-center justify-center text-xs font-bold"
-              >
+              <Link href="/login?redirect=/dashboard?tab=analyzer" className="btn-outline w-full h-10 flex items-center justify-center text-xs font-bold">
                 Masuk ke Akun
               </Link>
-              <button
-                onClick={() => setShowTrialModal(false)}
-                className="text-xs font-medium text-slate-grille hover:text-midnight-ink pt-1 cursor-pointer bg-transparent border-0"
-              >
+              <button onClick={() => setShowTrialModal(false)} className="text-xs font-medium text-slate-grille hover:text-midnight-ink pt-1 cursor-pointer bg-transparent border-0">
                 Kembali
               </button>
             </div>
@@ -1388,7 +1411,7 @@ export const SplitScreenAnalyzer: React.FC<SplitScreenAnalyzerProps> = ({
             <div className="space-y-2">
               <h3 className="text-base font-bold text-midnight-ink">Batas Harian Tercapai</h3>
               <p className="text-xs text-slate-grille leading-relaxed">
-                Anda telah menggunakan batas maksimal 8 kali pemindaian dokumen hari ini. Silakan coba lagi besok untuk melindungi stabilitas server kami.
+                Anda telah menggunakan batas maksimal 8 kali pemindaian dokumen hari ini. Silakan coba lagi besok untuk menjaga stabilitas server kami.
               </p>
             </div>
             <div className="flex flex-col gap-2 pt-2">

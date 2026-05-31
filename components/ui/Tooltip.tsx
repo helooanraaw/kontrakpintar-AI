@@ -28,7 +28,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {isVisible && (
         <span
           className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 p-4 
-            bg-[#051c1f] text-slate-200 text-xs rounded-sm shadow-xl border border-[#abffae]/25
+            bg-[#051c1f] text-slate-200 text-xs rounded-sm shadow-xl border border-[#ff9f1c]/25
             animate-slide-up"
           style={{ pointerEvents: "none" }}
         >

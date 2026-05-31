@@ -118,12 +118,14 @@ interface DraftGeneratorProps {
     draftText: string,
     instruksiKhusus?: string
   ) => void;
+  onGeneratingChange?: (isGenerating: boolean) => void;
 }
 
 export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
   initialDraft = null,
   initialFormData = null,
   onDraftComplete,
+  onGeneratingChange,
 }) => {
   const [step, setStep] = useState(1);
 
@@ -144,6 +146,14 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
   const [copied, setCopied] = useState(false);
   const [showTrialModal, setShowTrialModal] = useState(false);
   const [showDailyLimitModal, setShowDailyLimitModal] = useState(false);
+  const [highlights, setHighlights] = useState<Record<string, boolean>>({});
+
+  const triggerHighlight = (field: string) => {
+    setHighlights((prev) => ({ ...prev, [field]: true }));
+    setTimeout(() => {
+      setHighlights((prev) => ({ ...prev, [field]: false }));
+    }, 1500);
+  };
 
   useEffect(() => {
     if (initialFormData) {
@@ -178,6 +188,24 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
       }, 1800);
     }
     return () => clearInterval(interval);
+  }, [loading]);
+
+  useEffect(() => {
+    if (onGeneratingChange) {
+      onGeneratingChange(loading);
+    }
+  }, [loading, onGeneratingChange]);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (loading) {
+        e.preventDefault();
+        e.returnValue = "Progres pembuatan draf SPK sedang berjalan. Anda yakin ingin meninggalkan halaman?";
+        return e.returnValue;
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [loading]);
 
   const handleNext = (e: React.FormEvent) => {
@@ -215,7 +243,26 @@ export const DraftGenerator: React.FC<DraftGeneratorProps> = ({
       pihakKedua: { ...t.pihakKedua },
       detailJasa: { ...t.detailJasa },
       pembayaran: { ...t.pembayaran },
+      instruksiKhusus: formData.instruksiKhusus || "",
     });
+
+    const fields = ["pihakPertamaNama", "pihakPertamaDomisili", "pihakKeduaNama", "pihakKeduaDomisili", "lingkupKerja", "tenggatWaktu", "nilaiKontrak", "persentaseDP", "sanksiKeterlambatan"];
+    setHighlights((prev) => {
+      const next = { ...prev };
+      fields.forEach((f) => {
+        next[f] = true;
+      });
+      return next;
+    });
+    setTimeout(() => {
+      setHighlights((prev) => {
+        const next = { ...prev };
+        fields.forEach((f) => {
+          next[f] = false;
+        });
+        return next;
+      });
+    }, 1500);
   };
 
   /* ── Parser Markdown ke HTML untuk Word/PDF ── */
@@ -596,10 +643,11 @@ h3 {
   const STEP_LABELS = ["Profil Pihak", "Detail Jasa", "Pembayaran"];
 
   return (
-    <div className="w-full max-w-4xl mx-auto flex flex-col gap-6">
+    <div className={`w-full mx-auto flex flex-col gap-6 transition-all duration-300 ${!draft && !loading ? "max-w-6xl" : "max-w-4xl"}`}>
       {!draft && !loading ? (
         /* ──────── STEPPER FORM ──────── */
-        <div className="bg-white rounded-xl border border-border-light shadow-sm overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start w-full">
+          <div className="lg:col-span-7 bg-white rounded-xl border border-border-light shadow-sm overflow-hidden w-full">
           {/* Stepper Header */}
           <div className="px-6 py-5 border-b border-border-light bg-fog-gray/50">
             <div className="flex items-center gap-2">
@@ -626,7 +674,7 @@ h3 {
                           isActive
                             ? "text-midnight-ink"
                             : isDone
-                            ? "text-[#1d6b2a]"
+                            ? "text-amber-600"
                             : "text-slate-grille"
                         }`}
                       >
@@ -695,12 +743,13 @@ h3 {
                         className="input-field pl-9"
                         placeholder="Nama Lengkap Klien / Perusahaan"
                         value={formData.pihakPertama.nama}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setFormData({
                             ...formData,
                             pihakPertama: { ...formData.pihakPertama, nama: e.target.value },
-                          })
-                        }
+                          });
+                          triggerHighlight("pihakPertamaNama");
+                        }}
                         required
                       />
                     </div>
@@ -711,12 +760,13 @@ h3 {
                         className="input-field pl-9"
                         placeholder="Kota Domisili"
                         value={formData.pihakPertama.domisili}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setFormData({
                             ...formData,
                             pihakPertama: { ...formData.pihakPertama, domisili: e.target.value },
-                          })
-                        }
+                          });
+                          triggerHighlight("pihakPertamaDomisili");
+                        }}
                       />
                     </div>
                     <p className="text-[10px] text-slate-grille italic">
@@ -734,12 +784,13 @@ h3 {
                         className="input-field pl-9"
                         placeholder="Nama Bisnis / Nama Lengkap Anda"
                         value={formData.pihakKedua.nama}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setFormData({
                             ...formData,
                             pihakKedua: { ...formData.pihakKedua, nama: e.target.value },
-                          })
-                        }
+                          });
+                          triggerHighlight("pihakKeduaNama");
+                        }}
                         required
                       />
                     </div>
@@ -750,12 +801,13 @@ h3 {
                         className="input-field pl-9"
                         placeholder="Kota Domisili"
                         value={formData.pihakKedua.domisili}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setFormData({
                             ...formData,
                             pihakKedua: { ...formData.pihakKedua, domisili: e.target.value },
-                          })
-                        }
+                          });
+                          triggerHighlight("pihakKeduaDomisili");
+                        }}
                       />
                     </div>
                     <p className="text-[10px] text-slate-grille italic">
@@ -785,12 +837,13 @@ h3 {
                       className="input-field min-h-[140px] leading-relaxed"
                       placeholder="Jelaskan detail pekerjaan Anda, misal: Desain identitas visual termasuk 1 logo utama, 3 opsi warna, dan panduan brand book dalam format PDF."
                       value={formData.detailJasa.lingkupKerja}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setFormData({
                           ...formData,
                           detailJasa: { ...formData.detailJasa, lingkupKerja: e.target.value },
-                        })
-                      }
+                        });
+                        triggerHighlight("lingkupKerja");
+                      }}
                       required
                     />
                   </div>
@@ -806,12 +859,13 @@ h3 {
                         className="input-field pl-9"
                         placeholder="Misal: 30 Hari Kerja atau Sebelum 15 Desember 2026"
                         value={formData.detailJasa.tenggatWaktu}
-                        onChange={(e) =>
+                        onChange={(e) => {
                           setFormData({
                             ...formData,
                             detailJasa: { ...formData.detailJasa, tenggatWaktu: e.target.value },
-                          })
-                        }
+                          });
+                          triggerHighlight("tenggatWaktu");
+                        }}
                         required
                       />
                     </div>
@@ -846,12 +900,13 @@ h3 {
                           className="input-field pl-9"
                           placeholder="Misal: 10000000"
                           value={formData.pembayaran.nilaiKontrak}
-                          onChange={(e) =>
+                          onChange={(e) => {
                             setFormData({
                               ...formData,
                               pembayaran: { ...formData.pembayaran, nilaiKontrak: e.target.value },
-                            })
-                          }
+                            });
+                            triggerHighlight("nilaiKontrak");
+                          }}
                           required
                         />
                       </div>
@@ -869,15 +924,16 @@ h3 {
                           max="100"
                           className="input-field pr-8"
                           value={formData.pembayaran.persentaseDP}
-                          onChange={(e) =>
+                          onChange={(e) => {
                             setFormData({
                               ...formData,
                               pembayaran: {
                                 ...formData.pembayaran,
                                 persentaseDP: e.target.value,
                               },
-                            })
-                          }
+                            });
+                            triggerHighlight("persentaseDP");
+                          }}
                         />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-grille pointer-events-none">
                           %
@@ -896,15 +952,16 @@ h3 {
                       className="input-field"
                       placeholder="Misal: 0.1% per hari, maksimal 5% dari total nilai kontrak"
                       value={formData.pembayaran.sanksiKeterlambatan}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setFormData({
                           ...formData,
                           pembayaran: {
                             ...formData.pembayaran,
                             sanksiKeterlambatan: e.target.value,
                           },
-                        })
-                      }
+                        });
+                        triggerHighlight("sanksiKeterlambatan");
+                      }}
                     />
                     <p className="flex items-center gap-1.5 text-[10px] text-slate-grille mt-1.5">
                       <AlertCircle className="w-3 h-3 text-amber-500 shrink-0" />
@@ -912,7 +969,7 @@ h3 {
                     </p>
                   </div>
 
-                  {/* Instruksi Khusus (Opsional) */}
+                  {/* Pembatas / Tambahan ( NDA / Kustom ) */}
                   <div className="pt-2">
                     <label className="label-cap text-[9px] block mb-1.5">
                       Instruksi Khusus / Permintaan Kustom AI (Opsional)
@@ -921,12 +978,13 @@ h3 {
                       className="input-field min-h-[90px] leading-relaxed"
                       placeholder="Contoh: Tambahkan pasal kerahasiaan data (NDA) selama 3 tahun, draf menggunakan bahasa Inggris (bilingual), atau tambahkan pasal serah terima hasil kerja bertahap (milestones)."
                       value={formData.instruksiKhusus || ""}
-                      onChange={(e) =>
+                      onChange={(e) => {
                         setFormData({
                           ...formData,
                           instruksiKhusus: e.target.value,
-                        })
-                      }
+                        });
+                        triggerHighlight("instruksiKhusus");
+                      }}
                     />
                     <p className="text-[10px] text-slate-grille mt-1.5">
                       Tuliskan instruksi tambahan di sini jika Anda ingin menambahkan pasal khusus lainnya dalam draf SPK.
@@ -973,6 +1031,182 @@ h3 {
             </div>
           </form>
         </div>
+
+        {/* Kolom Kanan: Pratinjau Dokumen Real-Time */}
+        <div className="lg:col-span-5 lg:sticky lg:top-24 space-y-4 w-full">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-bold text-slate-grille uppercase tracking-wide flex items-center gap-1.5">
+              <FileText className="w-4 h-4 text-spring-leaf" />
+              Pratinjau Dokumen Real-Time
+            </span>
+            <span className="text-[10px] text-spring-leaf bg-pale-mint px-2.5 py-0.5 rounded-full font-bold border border-spring-leaf/25">
+              Draf Live
+            </span>
+          </div>
+
+          {/* Kertas Virtual */}
+          <div className="bg-white border border-border-light shadow-md rounded-sm p-6 sm:p-8 font-serif text-[11px] text-slate-800 leading-relaxed min-h-[500px] flex flex-col justify-between relative overflow-hidden select-none">
+            {/* Watermark/Background decoration */}
+            <div className="absolute inset-0 pointer-events-none opacity-[0.02] flex items-center justify-center">
+              <Building className="w-72 h-72 text-midnight-ink" />
+            </div>
+
+            <div className="space-y-4 z-10">
+              {/* Judul Kontrak */}
+              <div className="text-center font-bold text-[12px] uppercase border-b border-double border-slate-300 pb-2 mb-4">
+                SURAT PERJANJIAN KERJA SAMA
+                <br />
+                <span className="text-[10px] font-mono normal-case text-slate-grille font-normal">
+                  (SURAT PERINTAH KERJA - SPK)
+                </span>
+              </div>
+
+              {/* Pembuka */}
+              <p>
+                Perjanjian ini dibuat dan ditandatangani pada hari ini oleh dan di antara pihak-pihak di bawah ini:
+              </p>
+
+              {/* Pihak 1 */}
+              <div className="pl-4 space-y-1">
+                <p>
+                  <strong>1. Nama Klien: </strong>
+                  <span className={`px-1.5 py-0.5 rounded-sm transition-all duration-[1500ms] ${highlights.pihakPertamaNama ? "bg-amber-200 text-midnight-ink font-bold" : "bg-[#ff9f1c]/5"}`}>
+                    {formData.pihakPertama.nama || ".................................................."}
+                  </span>
+                </p>
+                <p>
+                  <strong>Domisili: </strong>
+                  <span className={`px-1.5 py-0.5 rounded-sm transition-all duration-[1500ms] ${highlights.pihakPertamaDomisili ? "bg-amber-200 text-midnight-ink font-bold" : "bg-[#ff9f1c]/5"}`}>
+                    {formData.pihakPertama.domisili || ".................................................."}
+                  </span>
+                </p>
+                <p className="text-[10px] text-slate-grille italic">
+                  Selanjutnya disebut sebagai <strong>PIHAK PERTAMA (Klien)</strong>.
+                </p>
+              </div>
+
+              {/* Pihak 2 */}
+              <div className="pl-4 space-y-1">
+                <p>
+                  <strong>2. Nama UMKM/Penyedia Jasa: </strong>
+                  <span className={`px-1.5 py-0.5 rounded-sm transition-all duration-[1500ms] ${highlights.pihakKeduaNama ? "bg-amber-200 text-midnight-ink font-bold" : "bg-[#ff9f1c]/5"}`}>
+                    {formData.pihakKedua.nama || ".................................................."}
+                  </span>
+                </p>
+                <p>
+                  <strong>Domisili: </strong>
+                  <span className={`px-1.5 py-0.5 rounded-sm transition-all duration-[1500ms] ${highlights.pihakKeduaDomisili ? "bg-amber-200 text-midnight-ink font-bold" : "bg-[#ff9f1c]/5"}`}>
+                    {formData.pihakKedua.domisili || ".................................................."}
+                  </span>
+                </p>
+                <p className="text-[10px] text-slate-grille italic">
+                  Selanjutnya disebut sebagai <strong>PIHAK KEDUA (Penyedia Jasa)</strong>.
+                </p>
+              </div>
+
+              <p>
+                Para Pihak sepakat untuk saling mengikatkan diri dalam Perjanjian Kerja Sama ini dengan ketentuan sebagai berikut:
+              </p>
+
+              {/* Pasal 1 */}
+              <div>
+                <h5 className="font-bold border-b border-slate-100 pb-0.5 mb-1 text-[11.5px] uppercase">
+                  PASAL 1: RUANG LINGKUP PEKERJAAN
+                </h5>
+                <p className="text-slate-700">
+                  PIHAK KEDUA setuju untuk melaksanakan dan menyelesaikan pekerjaan jasa berikut kepada PIHAK PERTAMA:
+                </p>
+                <div className={`p-2 bg-slate-50 border border-slate-100 rounded-sm mt-1 text-slate-800 transition-all duration-[1500ms] ${highlights.lingkupKerja ? "bg-amber-200 text-midnight-ink font-bold" : "bg-[#ff9f1c]/5"}`}>
+                  {formData.detailJasa.lingkupKerja || "Belum ada deskripsi lingkup pekerjaan. Silakan isi form di samping..."}
+                </div>
+              </div>
+
+              {/* Pasal 2 */}
+              <div>
+                <h5 className="font-bold border-b border-slate-100 pb-0.5 mb-1 text-[11.5px] uppercase">
+                  PASAL 2: TENGGAT WAKTU & JANGKA WAKTU
+                </h5>
+                <p>
+                  Jangka waktu penyelesaian pekerjaan sebagaimana dimaksud dalam Pasal 1 wajib diselesaikan oleh PIHAK KEDUA selambat-lambatnya pada:{" "}
+                  <span className={`px-1.5 py-0.5 rounded-sm transition-all duration-[1500ms] ${highlights.tenggatWaktu ? "bg-amber-200 text-midnight-ink font-bold" : "bg-[#ff9f1c]/5"}`}>
+                    {formData.detailJasa.tenggatWaktu || ".................................................."}
+                  </span>
+                </p>
+              </div>
+
+              {/* Pasal 3 */}
+              <div>
+                <h5 className="font-bold border-b border-slate-100 pb-0.5 mb-1 text-[11.5px] uppercase">
+                  PASAL 3: BIAYA JASA & MEKANISME PEMBAYARAN
+                </h5>
+                <p>
+                  1. Total biaya jasa atas pekerjaan sebagaimana disepakati sebesar:{" "}
+                  <strong className={`px-1.5 py-0.5 rounded-sm transition-all duration-[1500ms] ${highlights.nilaiKontrak ? "bg-amber-200 text-midnight-ink font-bold" : "bg-[#ff9f1c]/5"}`}>
+                    {formData.pembayaran.nilaiKontrak ? `Rp ${Number(formData.pembayaran.nilaiKontrak).toLocaleString("id-ID")}` : "Rp 0"}
+                  </strong>
+                </p>
+                <p>
+                  2. Uang Muka (DP) disepakati sebesar{" "}
+                  <span className={`px-1.5 py-0.5 rounded-sm transition-all duration-[1500ms] ${highlights.persentaseDP ? "bg-amber-200 text-midnight-ink font-bold" : "bg-[#ff9f1c]/5"}`}>
+                    {formData.pembayaran.persentaseDP || "0"}%
+                  </span>{" "}
+                  dari total biaya jasa, yang dibayarkan sebelum pekerjaan dimulai.
+                </p>
+              </div>
+
+              {/* Pasal 4 */}
+              <div>
+                <h5 className="font-bold border-b border-slate-100 pb-0.5 mb-1 text-[11.5px] uppercase">
+                  PASAL 4: SANKSI KETERLAMBATAN
+                </h5>
+                <p>
+                  Apabila terjadi keterlambatan dalam penyelesaian pekerjaan oleh PIHAK KEDUA, maka dikenakan sanksi berupa:{" "}
+                  <span className={`px-1.5 py-0.5 rounded-sm transition-all duration-[1500ms] ${highlights.sanksiKeterlambatan ? "bg-amber-200 text-midnight-ink font-bold" : "bg-[#ff9f1c]/5"}`}>
+                    {formData.pembayaran.sanksiKeterlambatan || "Sanksi keterlambatan belum ditentukan..."}
+                  </span>
+                </p>
+              </div>
+
+              {/* Instruksi Khusus */}
+              {formData.instruksiKhusus && (
+                <div>
+                  <h5 className="font-bold border-b border-slate-100 pb-0.5 mb-1 text-[11.5px] uppercase text-electric-blue">
+                    KLAUSUL TAMBAHAN (INSTRUKSI KUSTOM)
+                  </h5>
+                  <p className="italic text-slate-600">
+                    *AI akan merancang pasal tambahan berikut sesuai instruksi:
+                  </p>
+                  <div className={`p-2 bg-blue-50/50 border border-blue-100 rounded-sm mt-1 transition-all duration-[1500ms] ${highlights.instruksiKhusus ? "bg-amber-200 text-midnight-ink font-bold" : "bg-[#ff9f1c]/5"}`}>
+                    {formData.instruksiKhusus}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Tanda Tangan Simbolis */}
+            <div className="grid grid-cols-2 gap-4 mt-8 pt-4 border-t border-slate-200 text-center font-semibold text-[10px]">
+              <div>
+                <p>PIHAK PERTAMA</p>
+                <div className="h-12 flex items-center justify-center text-slate-400 italic text-[9px]">
+                  (Tanda Tangan Klien)
+                </div>
+                <p className="border-t border-slate-200 pt-1 font-bold">
+                  {formData.pihakPertama.nama || "____________________"}
+                </p>
+              </div>
+              <div>
+                <p>PIHAK KEDUA</p>
+                <div className="h-12 flex items-center justify-center text-slate-400 italic text-[9px]">
+                  (Tanda Tangan Penyedia Jasa)
+                </div>
+                <p className="border-t border-slate-200 pt-1 font-bold">
+                  {formData.pihakKedua.nama || "____________________"}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       ) : loading ? (
         /* ──────── LOADING STATE ──────── */
         <div className="bg-white rounded-xl border border-border-light shadow-sm p-12 flex flex-col items-center justify-center gap-5 min-h-[360px] text-center">
@@ -1040,7 +1274,7 @@ h3 {
               </button>
               <button
                 onClick={handlePrintPDF}
-                className="btn-outline text-xs py-1.5 px-3 flex items-center gap-1.5 text-emerald-700 border-emerald-200 hover:bg-emerald-50 active:scale-95 cursor-pointer"
+                className="btn-outline text-xs py-1.5 px-3 flex items-center gap-1.5 text-amber-700 border-amber-200 hover:bg-amber-50 active:scale-95 cursor-pointer"
               >
                 <Printer className="w-3.5 h-3.5" />
                 Cetak PDF

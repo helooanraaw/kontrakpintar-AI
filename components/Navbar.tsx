@@ -28,6 +28,20 @@ export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [activeUsers, setActiveUsers] = useState(16);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveUsers((prev) => {
+        const change = Math.random() > 0.5 ? 1 : -1;
+        const next = prev + change;
+        if (next < 14) return 14;
+        if (next > 19) return 19;
+        return next;
+      });
+    }, 4000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 12);
@@ -96,16 +110,18 @@ export default function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-5 py-3 flex justify-between items-center">
 
-        {/* Logo */}
-        <Link
-          href={isLoggedIn ? "/dashboard?tab=overview" : "/"}
-          className="flex items-center gap-2.5 group select-none"
-        >
-          <span className="text-[15px] font-bold text-[#00262b] tracking-tight">
-            Kontrak<span className="text-[#006af2]">Pintar</span>
-            <span className="text-[10px] font-bold text-[#354d51] ml-1 align-top mt-0.5 inline-block">AI</span>
-          </span>
-        </Link>
+        {/* Logo and Status */}
+        <div className="flex items-center gap-3">
+          <Link
+            href={isLoggedIn ? "/dashboard?tab=overview" : "/"}
+            className="flex items-center gap-2.5 group select-none"
+          >
+            <span className="text-[15px] font-bold text-[#00262b] tracking-tight">
+              Kontrak<span className="text-[#006af2]">Pintar</span>
+              <span className="text-[10px] font-bold text-[#354d51] ml-1 align-top mt-0.5 inline-block">AI</span>
+            </span>
+          </Link>
+        </div>
 
         {/* Desktop Nav */}
         <nav className="hidden md:flex items-center gap-1">

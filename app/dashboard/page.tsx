@@ -29,6 +29,11 @@ import {
   ClipboardCheck,
   MessageCircle,
   User,
+  X,
+  CheckCircle,
+  Copy,
+  Printer,
+  Building,
 } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { Tooltip } from "@/components/ui/Tooltip";
@@ -141,6 +146,8 @@ function DashboardPageContent() {
 
   const [activeTab, setActiveTab] = useState<ActiveTab>("overview");
   const [selectedTip, setSelectedTip] = useState({ title: "", desc: "" });
+  const [isGeneratingSPK, setIsGeneratingSPK] = useState(false);
+  const [activeHistoryDetail, setActiveHistoryDetail] = useState<HistoryItem | null>(null);
   
   // State Autentikasi
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -179,13 +186,30 @@ function DashboardPageContent() {
   ]);
   const [chatInput, setChatInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
-  const chatEndRef = React.useRef<HTMLDivElement>(null);
+  const chatContainerRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (activeTab === "faq") {
-      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
     }
-  }, [chatMessages, chatLoading, activeTab]);
+  }, [chatMessages, chatLoading]);
+
+  const renderFormattedText = (text: string) => {
+    if (!text) return null;
+    const parts = text.split(/\*\*([\s\S]*?)\*\*/g);
+    return parts.map((part, i) => {
+      if (i % 2 === 1) {
+        return <strong key={i} className="font-extrabold text-[#00262b]">{part}</strong>;
+      }
+      const subParts = part.split("\n");
+      return subParts.map((sub, j) => (
+        <React.Fragment key={`${i}-${j}`}>
+          {sub}
+          {j < subParts.length - 1 && <br />}
+        </React.Fragment>
+      ));
+    });
+  };
 
   const handleSendChatMessage = async (textToSend?: string) => {
     const messageText = textToSend || chatInput;
@@ -303,10 +327,18 @@ function DashboardPageContent() {
   }, [router]);
 
   useEffect(() => {
-    if (tabParam && ["overview", "analyzer", "wizard", "glossary", "faq"].includes(tabParam)) {
-      setActiveTab(tabParam);
+    const targetTab = tabParam || "overview";
+    if (["overview", "analyzer", "wizard", "glossary", "faq"].includes(targetTab)) {
+      if (activeTab === "wizard" && targetTab !== "wizard" && isGeneratingSPK) {
+        const confirmLeave = window.confirm("Progres pembuatan draf SPK sedang berjalan. Jika Anda pindah halaman, draf yang sedang digenerate atau data input dapat hilang. Apakah Anda yakin ingin keluar?");
+        if (!confirmLeave) {
+          router.replace("/dashboard?tab=wizard");
+          return;
+        }
+      }
+      setActiveTab(targetTab as ActiveTab);
     }
-  }, [tabParam]);
+  }, [tabParam, activeTab, isGeneratingSPK, router]);
 
   // Handler callback saat analisa kontrak selesai
   const handleAnalysisComplete = async (
@@ -323,6 +355,9 @@ function DashboardPageContent() {
         const filtered = prev.filter((item) => item.id !== saved.id);
         return [saved, ...filtered];
       });
+      // PRESERVE STATE
+      setSelectedAnalysisText(text);
+      setSelectedAnalysisResult(result);
     } catch (e) {
       console.error("Gagal mencatat analisis:", e);
     }
@@ -353,6 +388,15 @@ function DashboardPageContent() {
         const filtered = prev.filter((item) => item.id !== saved.id);
         return [saved, ...filtered];
       });
+      // PRESERVE STATE
+      setSelectedDraftText(draftText);
+      setSelectedDraftFormData({
+        pihakPertama,
+        pihakKedua,
+        detailJasa,
+        pembayaran,
+        instruksiKhusus,
+      });
     } catch (e) {
       console.error("Gagal mencatat SPK:", e);
     }
@@ -371,12 +415,24 @@ function DashboardPageContent() {
     }
   };
 
+  // Helper to check wizard warning before leaving
+  const checkWizardLeave = (target: ActiveTab) => {
+    if (activeTab === "wizard" && target !== "wizard" && isGeneratingSPK) {
+      return window.confirm("Progres pembuatan draf SPK sedang berjalan. Jika Anda pindah halaman, draf yang sedang digenerate atau data input dapat hilang. Apakah Anda yakin ingin keluar?");
+    }
+    return true;
+  };
+
   // Buka/Muat dokumen riwayat ke tab workspace
   const handleLoadItem = (item: HistoryItem) => {
+    const targetTab = item.type === "analysis" ? "analyzer" : "wizard";
+    if (!checkWizardLeave(targetTab)) return;
+
     if (item.type === "analysis") {
       setSelectedAnalysisText(item.contractText || "");
       setSelectedAnalysisResult(item.analysisResult || null);
       setActiveTab("analyzer");
+      router.push("/dashboard?tab=analyzer");
     } else {
       setSelectedDraftText(item.draftText || "");
       setSelectedDraftFormData({
@@ -387,20 +443,25 @@ function DashboardPageContent() {
         instruksiKhusus: item.instruksiKhusus || "",
       });
       setActiveTab("wizard");
+      router.push("/dashboard?tab=wizard");
     }
   };
 
   // Reset pemicu buat dokumen baru
   const handleNewAnalysis = () => {
+    if (!checkWizardLeave("analyzer")) return;
     setSelectedAnalysisText("");
     setSelectedAnalysisResult(null);
     setActiveTab("analyzer");
+    router.push("/dashboard?tab=analyzer");
   };
 
   const handleNewSPK = () => {
+    if (!checkWizardLeave("wizard")) return;
     setSelectedDraftText("");
     setSelectedDraftFormData(null);
     setActiveTab("wizard");
+    router.push("/dashboard?tab=wizard");
   };
 
   // Filter Glosarium
@@ -549,59 +610,73 @@ function DashboardPageContent() {
 
                 {/* Bento Grid Stats */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card variant="standard" className="p-5 flex flex-col justify-between min-h-[130px] hover:border-slate-300 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200">
+                  <Card variant="standard" className="p-5 flex flex-col justify-between min-h-[130px] hover:border-[#ff9f1c] hover:shadow-[0_0_15px_rgba(255,159,28,0.35)] hover:-translate-y-1 transition-all duration-300 relative group overflow-hidden cursor-pointer">
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] uppercase font-bold text-slate-grille tracking-wider">Total Dokumen</p>
-                      <div className="w-7 h-7 rounded-lg bg-fog-gray flex items-center justify-center">
-                        <FileText className="w-3.5 h-3.5 text-slate-grille/70" />
+                      <div className="w-7 h-7 rounded-lg bg-fog-gray flex items-center justify-center group-hover:bg-[#ff9f1c]/20 transition-colors">
+                        <FileText className="w-3.5 h-3.5 text-slate-grille/70 group-hover:text-midnight-ink" />
                       </div>
                     </div>
                     <div>
-                      <span className="text-4xl font-bold text-midnight-ink tracking-tight block">{totalScan + totalSPK}</span>
-                      <span className="text-[10px] text-slate-grille mt-1 block">Dokumen diproses</span>
+                      <span className="text-4xl font-bold text-midnight-ink tracking-tight block group-hover:scale-105 transition-transform duration-300 origin-left">{totalScan + totalSPK}</span>
+                      <div className="relative h-4 overflow-hidden mt-1">
+                        <span className="text-[10px] text-slate-grille transition-all duration-300 group-hover:-translate-y-4 block">Dokumen diproses</span>
+                        <span className="text-[9px] text-[#006af2] font-bold transition-all duration-300 translate-y-4 group-hover:translate-y-0 block absolute left-0 top-0">Detail: {totalScan} Scan | {totalSPK} SPK</span>
+                      </div>
                     </div>
                   </Card>
 
-                  <Card variant="standard" className="p-5 flex flex-col justify-between min-h-[130px] hover:border-slate-300 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200">
+                  <Card variant="standard" className="p-5 flex flex-col justify-between min-h-[130px] hover:border-[#ff9f1c] hover:shadow-[0_0_15px_rgba(255,159,28,0.35)] hover:-translate-y-1 transition-all duration-300 relative group overflow-hidden cursor-pointer">
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] uppercase font-bold text-slate-grille tracking-wider">Rata-rata Skor Aman</p>
-                      <div className="w-7 h-7 rounded-lg bg-[#f0f6ff] flex items-center justify-center">
-                        <ShieldCheck className="w-3.5 h-3.5 text-electric-blue" />
+                      <div className="w-7 h-7 rounded-lg bg-[#f0f6ff] flex items-center justify-center group-hover:bg-[#ff9f1c]/20 transition-colors">
+                        <ShieldCheck className="w-3.5 h-3.5 text-electric-blue group-hover:text-midnight-ink" />
                       </div>
                     </div>
                     <div>
-                      <span className="text-4xl font-bold text-electric-blue tracking-tight block">
+                      <span className="text-4xl font-bold text-electric-blue tracking-tight block group-hover:scale-105 transition-transform duration-300 origin-left">
                         {avgScore > 0 ? `${avgScore}%` : "—"}
                       </span>
-                      <span className="text-[10px] font-semibold mt-1 block" style={{ color: avgScore >= 80 ? '#15803d' : avgScore >= 60 ? '#b45309' : avgScore > 0 ? '#dc2626' : '#354d51' }}>
-                        {avgScore >= 80 ? "Sangat Aman" : avgScore >= 60 ? "Cukup Aman" : avgScore > 0 ? "Rawan" : "Belum ada analisis"}
-                      </span>
+                      <div className="relative h-4 overflow-hidden mt-1">
+                        <span className="text-[10px] font-semibold transition-all duration-300 group-hover:-translate-y-4 block" style={{ color: avgScore >= 80 ? '#15803d' : avgScore >= 60 ? '#b45309' : avgScore > 0 ? '#dc2626' : '#354d51' }}>
+                          {avgScore >= 80 ? "Sangat Aman" : avgScore >= 60 ? "Cukup Aman" : avgScore > 0 ? "Rawan" : "Belum ada analisis"}
+                        </span>
+                        <span className="text-[9px] text-amber-600 font-bold transition-all duration-300 translate-y-4 group-hover:translate-y-0 block absolute left-0 top-0">
+                          Sampel: {analysisItems.length} kontrak
+                        </span>
+                      </div>
                     </div>
                   </Card>
 
-                  <Card variant="standard" className="p-5 flex flex-col justify-between min-h-[130px] hover:border-slate-300 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200">
+                  <Card variant="standard" className="p-5 flex flex-col justify-between min-h-[130px] hover:border-[#ff9f1c] hover:shadow-[0_0_15px_rgba(255,159,28,0.35)] hover:-translate-y-1 transition-all duration-300 relative group overflow-hidden cursor-pointer">
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] uppercase font-bold text-slate-grille tracking-wider">Red Flags Dideteksi</p>
-                      <div className="w-7 h-7 rounded-lg bg-[#fff9f7] flex items-center justify-center">
-                        <ShieldAlert className="w-3.5 h-3.5 text-amber-pop" />
+                      <div className="w-7 h-7 rounded-lg bg-[#fff9f7] flex items-center justify-center group-hover:bg-[#ff9f1c]/20 transition-colors">
+                        <ShieldAlert className="w-3.5 h-3.5 text-amber-pop group-hover:text-midnight-ink" />
                       </div>
                     </div>
                     <div>
-                      <span className="text-4xl font-bold text-amber-pop tracking-tight block">{totalRedFlags}</span>
-                      <span className="text-[10px] text-slate-grille mt-1 block">Pasal bermasalah</span>
+                      <span className="text-4xl font-bold text-amber-pop tracking-tight block group-hover:scale-105 transition-transform duration-300 origin-left">{totalRedFlags}</span>
+                      <div className="relative h-4 overflow-hidden mt-1">
+                        <span className="text-[10px] text-slate-grille transition-all duration-300 group-hover:-translate-y-4 block">Pasal bermasalah</span>
+                        <span className="text-[9px] text-amber-600 font-bold transition-all duration-300 translate-y-4 group-hover:translate-y-0 block absolute left-0 top-0">Rata-rata: {totalScan > 0 ? (totalRedFlags / totalScan).toFixed(1) : 0} per berkas</span>
+                      </div>
                     </div>
                   </Card>
 
-                  <Card variant="standard" className="p-5 flex flex-col justify-between min-h-[130px] hover:border-slate-300 hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200">
+                  <Card variant="standard" className="p-5 flex flex-col justify-between min-h-[130px] hover:border-[#ff9f1c] hover:shadow-[0_0_15px_rgba(255,159,28,0.35)] hover:-translate-y-1 transition-all duration-300 relative group overflow-hidden cursor-pointer">
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] uppercase font-bold text-slate-grille tracking-wider">SPK Draf Terbuat</p>
-                      <div className="w-7 h-7 rounded-lg bg-[#eafde8] flex items-center justify-center">
-                        <ClipboardCheck className="w-3.5 h-3.5 text-green-700" />
+                      <div className="w-7 h-7 rounded-lg bg-pale-mint flex items-center justify-center group-hover:bg-[#ff9f1c]/20 transition-colors border border-spring-leaf/25">
+                        <ClipboardCheck className="w-3.5 h-3.5 text-spring-leaf group-hover:text-midnight-ink" />
                       </div>
                     </div>
                     <div>
-                      <span className="text-4xl font-bold text-midnight-ink tracking-tight block">{totalSPK}</span>
-                      <span className="text-[10px] text-green-700 font-semibold mt-1 block">Draf siap pakai</span>
+                      <span className="text-4xl font-bold text-midnight-ink tracking-tight block group-hover:scale-105 transition-transform duration-300 origin-left">{totalSPK}</span>
+                      <div className="relative h-4 overflow-hidden mt-1">
+                        <span className="text-[10px] text-spring-leaf font-semibold transition-all duration-300 group-hover:-translate-y-4 block">Draf siap pakai</span>
+                        <span className="text-[9px] text-spring-leaf font-bold transition-all duration-300 translate-y-4 group-hover:translate-y-0 block absolute left-0 top-0">100% Sesuai KUHPerdata</span>
+                      </div>
                     </div>
                   </Card>
                 </div>
@@ -708,7 +783,7 @@ function DashboardPageContent() {
                               Akumulasi scanning dan pembuatan draf SPK.
                             </p>
                           </div>
-                          <span className="text-[10px] text-green-700 bg-pale-mint px-2.5 py-0.5 rounded-full font-bold border border-spring-leaf/30 shrink-0">
+                          <span className="text-[10px] text-spring-leaf bg-pale-mint px-2.5 py-0.5 rounded-full font-bold border border-spring-leaf/30 shrink-0">
                             Aktif
                           </span>
                         </div>
@@ -779,11 +854,11 @@ function DashboardPageContent() {
                     onClick={handleNewSPK}
                     className="group border border-border-light bg-white rounded-xl p-5 cursor-pointer hover:border-spring-leaf hover:-translate-y-0.5 hover:shadow-sm transition-all duration-200 flex items-start gap-4"
                   >
-                    <div className="w-10 h-10 rounded-lg bg-[#abffae]/15 flex items-center justify-center text-[#1d6b2a] group-hover:bg-[#abffae] group-hover:text-midnight-ink transition-all shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-pale-mint flex items-center justify-center text-[#8b3911] group-hover:bg-[#ff9f1c] group-hover:text-midnight-ink transition-all shrink-0 border border-[#ff9f1c]/10">
                       <FileCheck className="w-5 h-5" />
                     </div>
                     <div>
-                      <h4 className="text-sm font-bold text-midnight-ink group-hover:text-[#195e24] transition-colors flex items-center gap-1.5">
+                      <h4 className="text-sm font-bold text-midnight-ink group-hover:text-[#8b3911] transition-colors flex items-center gap-1.5">
                         Buat SPK AI Baru <Plus className="w-3.5 h-3.5" />
                       </h4>
                       <p className="text-xs text-slate-grille mt-1 leading-relaxed">
@@ -793,8 +868,8 @@ function DashboardPageContent() {
                   </div>
                 </div>
 
-                {/* History Log Table */}
-                <div className="bg-white rounded-xl border border-border-light shadow-sm overflow-hidden">
+                {/* Section: History Log Table (Full Width) */}
+                <div className="bg-white rounded-xl border border-border-light shadow-sm overflow-hidden flex flex-col justify-between">
                   <div className="px-5 py-4 border-b border-border-light flex items-center justify-between">
                     <div>
                       <h4 className="text-sm font-bold text-midnight-ink">Riwayat Berkas & Aktivitas</h4>
@@ -810,12 +885,12 @@ function DashboardPageContent() {
                   </div>
 
                   {loadingHistory ? (
-                    <div className="py-12 flex flex-col items-center justify-center gap-2">
+                    <div className="py-12 flex flex-col items-center justify-center gap-2 flex-1">
                       <Loader2 className="w-6 h-6 text-slate-grille animate-spin" />
                       <p className="text-xs text-slate-grille">Menghubungkan database...</p>
                     </div>
                   ) : historyList.length === 0 ? (
-                    <div className="py-16 text-center">
+                    <div className="py-16 text-center flex-1">
                       <p className="text-xs text-slate-grille">Belum ada riwayat dokumen hukum yang tersimpan.</p>
                       <button 
                         onClick={handleNewAnalysis}
@@ -825,14 +900,14 @@ function DashboardPageContent() {
                       </button>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto flex-1">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="bg-fog-gray/50 border-b border-border-light text-slate-grille font-semibold">
                             <th className="px-5 py-3">Nama Berkas / Dokumen</th>
                             <th className="px-5 py-3">Jenis Kegiatan</th>
-                            <th className="px-5 py-3">Tanggal Dibuat</th>
-                            <th className="px-5 py-3 text-center">Skor Keamanan / Status</th>
+                            <th className="px-5 py-3">Tanggal</th>
+                            <th className="px-5 py-3 text-center">Skor / Status</th>
                             <th className="px-5 py-3 text-right">Aksi</th>
                           </tr>
                         </thead>
@@ -841,12 +916,12 @@ function DashboardPageContent() {
                             <tr 
                               key={item.id} 
                               className="hover:bg-fog-gray/30 transition-colors group cursor-pointer"
-                              onClick={() => handleLoadItem(item)}
+                              onClick={() => setActiveHistoryDetail(item)}
                             >
                               <td className="px-5 py-3.5">
                                 <div className="flex items-center gap-2">
                                   <FileText className="w-4 h-4 text-slate-grille shrink-0" />
-                                  <span className="font-bold text-midnight-ink max-w-[240px] truncate block group-hover:text-electric-blue transition-colors">
+                                  <span className="font-bold text-midnight-ink max-w-[280px] truncate block group-hover:text-electric-blue transition-colors">
                                     {item.title}
                                   </span>
                                 </div>
@@ -857,7 +932,7 @@ function DashboardPageContent() {
                                     Pindaian Kontrak
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#eafde8] text-[#1d6b2a] font-semibold text-[10px] border border-green-100">
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-pale-mint text-spring-leaf font-bold text-[10px] border border-[#ff9f1c]/20">
                                     Draf SPK Baru
                                   </span>
                                 )}
@@ -866,16 +941,15 @@ function DashboardPageContent() {
                                 {new Date(item.timestamp).toLocaleDateString("id-ID", {
                                   day: "numeric",
                                   month: "short",
-                                  year: "numeric",
                                   hour: "2-digit",
                                   minute: "2-digit",
-                                })}
+                                }) + " WIB"}
                               </td>
                               <td className="px-5 py-3.5 text-center">
                                 {item.type === "analysis" ? (
                                   <span className={`inline-flex items-center font-bold px-2 py-0.5 rounded-full text-[10px] ${
                                     (item.score || 0) >= 80 
-                                      ? "bg-green-50 text-green-700" 
+                                      ? "bg-blue-50 text-blue-700" 
                                       : (item.score || 0) >= 60 
                                         ? "bg-amber-50 text-amber-700" 
                                         : "bg-red-50 text-red-700"
@@ -883,7 +957,7 @@ function DashboardPageContent() {
                                     {item.score}% Aman
                                   </span>
                                 ) : (
-                                  <span className="inline-flex items-center font-bold px-2 py-0.5 rounded-full text-[10px] bg-slate-100 text-slate-700">
+                                  <span className="inline-flex items-center font-bold px-2 py-0.5 rounded-full text-[10px] bg-warm-mist text-[#8b3911] border border-amber-pop/10">
                                     Siap Cetak
                                   </span>
                                 )}
@@ -891,7 +965,7 @@ function DashboardPageContent() {
                               <td className="px-5 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button
-                                    onClick={() => handleLoadItem(item)}
+                                    onClick={() => setActiveHistoryDetail(item)}
                                     className="p-1.5 rounded hover:bg-white hover:text-electric-blue text-slate-grille border border-transparent hover:border-border-light transition-all active:scale-95"
                                     title="Buka Dokumen"
                                   >
@@ -947,6 +1021,7 @@ function DashboardPageContent() {
                   initialDraft={selectedDraftText} 
                   initialFormData={selectedDraftFormData}
                   onDraftComplete={handleDraftComplete}
+                  onGeneratingChange={setIsGeneratingSPK}
                 />
               </div>
             )}
@@ -1030,10 +1105,10 @@ function DashboardPageContent() {
                           </p>
                         </div>
                         <div className="bg-pale-mint/60 border-l-2 border-spring-leaf rounded-sm px-3 py-2.5 mt-auto">
-                          <p className="text-[9px] font-bold text-[#1d6b2a] uppercase tracking-wider mb-1">
+                          <p className="text-[9px] font-bold text-spring-leaf uppercase tracking-wider mb-1">
                             Analogi Sehari-Hari
                           </p>
-                          <p className="text-xs italic text-green-900 leading-relaxed">
+                          <p className="text-xs italic text-amber-900 leading-relaxed">
                             &ldquo;{item.analogy}&rdquo;
                           </p>
                         </div>
@@ -1151,22 +1226,22 @@ function DashboardPageContent() {
                     {/* Header: Ganti tampilan robot gelap jadi kartu hangat/natural */}
                     <div className="px-5 py-4 border-b border-border-light bg-fog-gray/20 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-[#eafde8] border border-spring-leaf/30 flex items-center justify-center shrink-0">
-                          <MessageCircle className="w-4 h-4 text-[#1d6b2a]" />
+                        <div className="w-9 h-9 rounded-full bg-pale-mint border border-spring-leaf/30 flex items-center justify-center shrink-0">
+                          <MessageCircle className="w-4 h-4 text-[#ff9f1c]" />
                         </div>
                         <div>
                           <h4 className="text-sm font-bold text-midnight-ink leading-tight">Tanya KontrakPintar</h4>
                           <p className="text-[10px] text-slate-grille">Asisten panduan platform & hukum UMKM</p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 text-[10px] text-green-700 bg-[#eafde8] px-2.5 py-1 rounded-full font-semibold border border-spring-leaf/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                      <div className="flex items-center gap-1.5 text-[10px] text-spring-leaf bg-pale-mint px-2.5 py-1 rounded-full font-semibold border border-spring-leaf/20">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#ff9f1c] shrink-0" />
                         Aktif
                       </div>
                     </div>
 
                     {/* Chat Messages Log */}
-                    <div className="p-4 h-[320px] overflow-y-auto flex flex-col gap-3 bg-white custom-scrollbar">
+                    <div ref={chatContainerRef} className="p-4 h-[320px] overflow-y-auto flex flex-col gap-3 bg-white custom-scrollbar">
                       {chatMessages.map((msg, idx) => {
                         const isUser = msg.role === "user";
                         return (
@@ -1178,8 +1253,8 @@ function DashboardPageContent() {
                           >
                             {/* Avatar */}
                             {!isUser && (
-                              <div className="w-7 h-7 rounded-full bg-[#eafde8] border border-spring-leaf/20 flex items-center justify-center shrink-0 mt-0.5">
-                                <MessageCircle className="w-3.5 h-3.5 text-[#1d6b2a]" />
+                              <div className="w-7 h-7 rounded-full bg-pale-mint border border-spring-leaf/20 flex items-center justify-center shrink-0 mt-0.5">
+                                <MessageCircle className="w-3.5 h-3.5 text-[#ff9f1c]" />
                               </div>
                             )}
                             <div
@@ -1189,7 +1264,7 @@ function DashboardPageContent() {
                                   : "bg-fog-gray/60 border border-border-light text-midnight-ink rounded-tl-sm"
                               }`}
                             >
-                              {msg.content}
+                              {renderFormattedText(msg.content)}
                             </div>
                             {isUser && (
                               <div className="w-7 h-7 rounded-full bg-midnight-ink/8 border border-border-light flex items-center justify-center shrink-0 mt-0.5">
@@ -1201,8 +1276,8 @@ function DashboardPageContent() {
                       })}
                       {chatLoading && (
                         <div className="flex flex-row gap-2">
-                          <div className="w-7 h-7 rounded-full bg-[#eafde8] border border-spring-leaf/20 flex items-center justify-center shrink-0 mt-0.5">
-                            <MessageCircle className="w-3.5 h-3.5 text-[#1d6b2a]" />
+                          <div className="w-7 h-7 rounded-full bg-pale-mint border border-spring-leaf/20 flex items-center justify-center shrink-0 mt-0.5">
+                            <MessageCircle className="w-3.5 h-3.5 text-[#ff9f1c]" />
                           </div>
                           <div className="bg-fog-gray/60 border border-border-light rounded-2xl rounded-tl-sm px-3.5 py-2.5 flex items-center gap-2">
                             <span className="flex gap-1">
@@ -1213,7 +1288,6 @@ function DashboardPageContent() {
                           </div>
                         </div>
                       )}
-                      <div ref={chatEndRef} />
                     </div>
 
                     {/* Quick Questions */}
@@ -1266,6 +1340,255 @@ function DashboardPageContent() {
                         </svg>
                       </button>
                     </form>
+                  </div>
+                </div>
+              </div>
+            )}
+            {/* ── DETAIL RIWAYAT MODAL ── */}
+            {activeHistoryDetail && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-3xl w-full max-h-[85vh] flex flex-col overflow-hidden animate-scale-in">
+                  {/* Header */}
+                  <div className="px-6 py-4 border-b border-border-light bg-[#00262b] text-white flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <FileText className="w-5 h-5 text-[#ff9f1c]" />
+                      <div className="text-left">
+                        <h3 className="text-sm font-bold tracking-tight text-white">{activeHistoryDetail.title}</h3>
+                        <p className="text-[10px] text-white/60 font-mono uppercase mt-0.5">
+                          {activeHistoryDetail.type === "analysis" ? "Hasil Scan Kontrak" : "Draf SPK Baru"} &bull; {new Date(activeHistoryDetail.timestamp).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setActiveHistoryDetail(null)}
+                      className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition border-0 cursor-pointer"
+                      title="Tutup"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* Scrollable Content */}
+                  <div className="flex-1 overflow-y-auto p-6 bg-canvas/40 custom-scrollbar text-left">
+                    {activeHistoryDetail.type === "analysis" ? (
+                      /* --- SCAN KONTRAK REPORT VIEW --- */
+                      <div className="space-y-6">
+                        {/* Gauge & Stats */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Score Gauge */}
+                          <div className="bg-white rounded-xl border border-border-light p-4 flex flex-col items-center justify-center text-center shadow-xs">
+                            <p className="text-[9px] uppercase font-bold text-slate-grille tracking-wider mb-2">Skor Keamanan</p>
+                            <div className="relative w-20 h-20 flex items-center justify-center">
+                              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                <path className="text-slate-100" strokeWidth="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                <path className="text-electric-blue transition-all duration-1000 ease-out" strokeWidth="3" strokeDasharray={`${activeHistoryDetail.score}, 100`} strokeLinecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                              </svg>
+                              <div className="absolute text-center">
+                                <span className="text-base font-extrabold text-[#00262b]">{activeHistoryDetail.score}%</span>
+                              </div>
+                            </div>
+                            <p className="text-[10px] font-bold mt-2" style={{ color: (activeHistoryDetail.score || 0) >= 80 ? '#10b981' : (activeHistoryDetail.score || 0) >= 60 ? '#f59e0b' : '#ef4444' }}>
+                              {(activeHistoryDetail.score || 0) >= 80 ? "SANGAT AMAN" : (activeHistoryDetail.score || 0) >= 60 ? "CUKUP AMAN" : "RAWAN JEBAKAN"}
+                            </p>
+                          </div>
+
+                          {/* Meta info card */}
+                          <div className="bg-white rounded-xl border border-border-light p-4 flex flex-col justify-between shadow-xs md:col-span-2">
+                            <div className="space-y-1.5">
+                              <p className="text-[10px] font-bold text-midnight-ink uppercase tracking-wide">Ringkasan Analisis</p>
+                              <p className="text-xs text-slate-grille leading-relaxed">
+                                Kontrak ini telah diaudit secara komparatif oleh sistem kecerdasan buatan Gemini. AI mendeteksi sebanyak <strong>{activeHistoryDetail.redFlagsCount || 0} Klausul Red Flags</strong> potensial yang berisiko merugikan pihak pelaku usaha.
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3 pt-2 border-t border-border-light text-[10px] font-bold text-slate-grille">
+                              <span>Red Flags: {activeHistoryDetail.redFlagsCount || 0}</span>
+                              <span>&bull;</span>
+                              <span>Catatan Adil: {activeHistoryDetail.analysisResult?.catatanPositif?.length || 0}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Red Flags List */}
+                        {activeHistoryDetail.analysisResult?.redFlags && activeHistoryDetail.analysisResult.redFlags.length > 0 && (
+                          <div className="space-y-3">
+                            <h4 className="text-xs font-bold text-[#8b3911] uppercase tracking-wider flex items-center gap-1.5">
+                              <AlertTriangle className="w-4 h-4 text-amber-500" /> Daftar Red Flags Terdeteksi ({activeHistoryDetail.analysisResult.redFlags.length})
+                            </h4>
+                            <div className="space-y-3.5">
+                              {activeHistoryDetail.analysisResult.redFlags.map((flag: any, idx: number) => (
+                                <div key={idx} className="bg-white rounded-xl border border-border-light overflow-hidden shadow-xs">
+                                  <div className="px-4 py-2.5 bg-warm-mist flex items-center justify-between border-b border-border-light">
+                                    <span className="text-xs font-bold text-midnight-ink">Temuan #{idx + 1}</span>
+                                    <span className="text-[9px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
+                                      {flag.tingkatKeparahan || "Kritis"}
+                                    </span>
+                                  </div>
+                                  <div className="p-4 space-y-3 text-xs text-left">
+                                    <div>
+                                      <p className="text-[9px] font-bold text-slate-grille uppercase tracking-wider mb-1">Potensi Risiko</p>
+                                      <p className="text-slate-700 leading-relaxed">{flag.alasanBahaya}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-[9px] font-bold text-slate-grille uppercase tracking-wider mb-1">Kutipan Asli Kontrak</p>
+                                      <blockquote className="text-[11px] font-mono text-slate-600 bg-fog-gray border-l-2 border-border-medium px-3 py-2 italic rounded-sm leading-relaxed">
+                                        &ldquo;{flag.kutipanAsli}&rdquo;
+                                      </blockquote>
+                                    </div>
+                                    <div>
+                                      <p className="text-[9px] font-bold text-amber-800 uppercase tracking-wider mb-1">Usulan Revisi KontrakPintar</p>
+                                      <p className="text-amber-900 font-medium bg-pale-mint border border-[#ff9f1c]/20 rounded-lg px-3 py-2 leading-relaxed">{flag.usulanRevisi}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Catatan Positif */}
+                        {activeHistoryDetail.analysisResult?.catatanPositif && activeHistoryDetail.analysisResult.catatanPositif.length > 0 && (
+                          <div className="space-y-3">
+                            <h4 className="text-xs font-bold text-midnight-ink uppercase tracking-wider flex items-center gap-1.5">
+                              <CheckCircle className="w-4 h-4 text-spring-leaf" /> Klausul Adil & Seimbang
+                            </h4>
+                            <div className="bg-white rounded-xl border border-border-light p-4 shadow-xs">
+                              <ul className="space-y-2 text-xs text-left">
+                                {activeHistoryDetail.analysisResult.catatanPositif.map((pos: string, idx: number) => (
+                                  <li key={idx} className="flex items-start gap-2 text-slate-700 leading-relaxed">
+                                    <CheckCircle className="w-3.5 h-3.5 text-spring-leaf shrink-0 mt-0.5" />
+                                    <span>{pos}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Rekomendasi Umum */}
+                        {activeHistoryDetail.analysisResult?.rekomendasiUmum && (
+                          <div className="space-y-2">
+                            <h4 className="text-xs font-bold text-[#006af2] uppercase tracking-wider flex items-center gap-1.5">
+                              <Sparkles className="w-4 h-4" /> Rekomendasi Umum
+                            </h4>
+                            <div className="bg-white rounded-xl border border-border-light p-4 shadow-xs text-xs text-slate-700 leading-relaxed text-left">
+                              {activeHistoryDetail.analysisResult.rekomendasiUmum}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      /* --- SPK DRAFT VIEW --- */
+                      <div className="space-y-5">
+                        <div className="bg-white border border-border-light shadow-md rounded-sm p-8 sm:p-10 font-serif text-[11.5px] text-slate-800 leading-relaxed max-w-2xl mx-auto relative overflow-hidden select-text text-left">
+                          {/* Watermark */}
+                          <div className="absolute inset-0 pointer-events-none opacity-[0.02] flex items-center justify-center">
+                            <Building className="w-72 h-72 text-midnight-ink" />
+                          </div>
+
+                          <div className="space-y-5 z-10 relative">
+                            <div className="text-center font-bold text-[12.5px] uppercase border-b border-double border-slate-300 pb-2 mb-5">
+                              SURAT PERJANJIAN KERJA SAMA
+                              <br />
+                              <span className="text-[10px] font-mono normal-case text-slate-grille font-normal">(SURAT PERINTAH KERJA - SPK)</span>
+                            </div>
+
+                            <p>
+                              Perjanjian ini dibuat dan ditandatangani pada tanggal <strong>{new Date(activeHistoryDetail.timestamp).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</strong> oleh dan di antara pihak-pihak di bawah ini:
+                            </p>
+
+                            <div className="pl-4 space-y-1.5">
+                              <p><strong>1. Nama Klien:</strong> {activeHistoryDetail.pihakPertama?.nama || "...................."}</p>
+                              <p><strong>Domisili:</strong> {activeHistoryDetail.pihakPertama?.domisili || "...................."}</p>
+                              <p className="text-[10.5px] text-slate-grille italic">Selanjutnya disebut sebagai <strong>PIHAK PERTAMA (Klien)</strong>.</p>
+                            </div>
+
+                            <div className="pl-4 space-y-1.5">
+                              <p><strong>2. Nama Penyedia Jasa:</strong> {activeHistoryDetail.pihakKedua?.nama || "...................."}</p>
+                              <p><strong>Domisili:</strong> {activeHistoryDetail.pihakKedua?.domisili || "...................."}</p>
+                              <p className="text-[10.5px] text-slate-grille italic">Selanjutnya disebut sebagai <strong>PIHAK KEDUA (Penyedia Jasa)</strong>.</p>
+                            </div>
+
+                            <p>Para Pihak sepakat untuk saling mengikatkan diri dalam Perjanjian Kerja Sama ini dengan ketentuan sebagai berikut:</p>
+
+                            <div>
+                              <h5 className="font-bold border-b border-slate-100 pb-0.5 mb-1 text-[12px] uppercase">PASAL 1: RUANG LINGKUP PEKERJAAN</h5>
+                              <p className="text-slate-700">{activeHistoryDetail.detailJasa?.lingkupKerja || "...................."}</p>
+                            </div>
+
+                            <div>
+                              <h5 className="font-bold border-b border-slate-100 pb-0.5 mb-1 text-[12px] uppercase">PASAL 2: TENGGAT WAKTU & JANGKA WAKTU</h5>
+                              <p>Jangka waktu penyelesaian pekerjaan sebagaimana dimaksud dalam Pasal 1 wajib diselesaikan selambat-lambatnya pada: <strong>{activeHistoryDetail.detailJasa?.tenggatWaktu || "...................."}</strong></p>
+                            </div>
+
+                            <div>
+                              <h5 className="font-bold border-b border-slate-100 pb-0.5 mb-1 text-[12px] uppercase">PASAL 3: BIAYA JASA & MEKANISME PEMBAYARAN</h5>
+                              <p>1. Total biaya jasa atas pekerjaan disepakati sebesar: <strong>{activeHistoryDetail.pembayaran?.nilaiKontrak ? `Rp ${Number(activeHistoryDetail.pembayaran.nilaiKontrak).toLocaleString("id-ID")}` : "Rp 0"}</strong></p>
+                              <p>2. Uang Muka (DP) disepakati sebesar <strong>{activeHistoryDetail.pembayaran?.persentaseDP || "0"}%</strong> dari total biaya jasa yang dibayarkan sebelum pekerjaan dimulai.</p>
+                            </div>
+
+                            <div>
+                              <h5 className="font-bold border-b border-slate-100 pb-0.5 mb-1 text-[12px] uppercase">PASAL 4: SANKSI KETERLAMBATAN</h5>
+                              <p>Apabila terjadi keterlambatan dalam penyelesaian pekerjaan oleh PIHAK KEDUA, maka dikenakan sanksi berupa: <strong>{activeHistoryDetail.pembayaran?.sanksiKeterlambatan || "...................."}</strong></p>
+                            </div>
+
+                            {activeHistoryDetail.instruksiKhusus && (
+                              <div>
+                                <h5 className="font-bold border-b border-slate-100 pb-0.5 mb-1 text-[12px] uppercase text-[#006af2]">KLAUSUL TAMBAHAN</h5>
+                                <p className="italic text-slate-700">{activeHistoryDetail.instruksiKhusus}</p>
+                              </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-4 mt-8 pt-4 border-t border-slate-200 text-center font-semibold text-[10px]">
+                              <div>
+                                <p>PIHAK PERTAMA</p>
+                                <div className="h-10 flex items-center justify-center text-slate-400 italic text-[9px]">(Tanda Tangan Klien)</div>
+                                <p className="border-t border-slate-200 pt-1 font-bold">{activeHistoryDetail.pihakPertama?.nama || "____________________"}</p>
+                              </div>
+                              <div>
+                                <p>PIHAK KEDUA</p>
+                                <div className="h-10 flex items-center justify-center text-slate-400 italic text-[9px]">(Tanda Tangan Penyedia Jasa)</div>
+                                <p className="border-t border-slate-200 pt-1 font-bold">{activeHistoryDetail.pihakKedua?.nama || "____________________"}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div className="px-6 py-4 border-t border-border-light bg-fog-gray/30 flex items-center justify-between gap-3 shrink-0">
+                    <button 
+                      onClick={() => setActiveHistoryDetail(null)}
+                      className="btn-outline text-xs py-2 px-4 cursor-pointer font-bold border-border-light hover:bg-slate-50"
+                    >
+                      Tutup
+                    </button>
+                    
+                    <div className="flex items-center gap-2">
+                      {activeHistoryDetail.type === "draft" && (
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(activeHistoryDetail.draftText || "");
+                            alert("Teks draf SPK berhasil disalin ke clipboard!");
+                          }}
+                          className="btn-outline text-xs py-2 px-4 cursor-pointer font-bold flex items-center gap-1.5 bg-white"
+                        >
+                          <Copy className="w-3.5 h-3.5" /> Salin Draf
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          const itemToLoad = activeHistoryDetail;
+                          setActiveHistoryDetail(null);
+                          handleLoadItem(itemToLoad);
+                        }}
+                        className="btn-primary text-xs py-2 px-4 cursor-pointer font-bold flex items-center gap-1.5"
+                      >
+                        <FolderOpen className="w-3.5 h-3.5" /> Buka di Workspace
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

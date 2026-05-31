@@ -16,9 +16,9 @@
   --color-slate-grille: #4a6468;
   --color-deep-teal: #437278;
   --color-amber-pop: #8b3911;
-  --color-spring-leaf: #abffae;
+  --color-spring-leaf: #ff9f1c;
   --color-electric-blue: #006af2;
-  --color-pale-mint: #eafde8;
+  --color-pale-mint: #fffbeb;
   --color-canvas: #ebebeb;
   --color-fog-gray: #fafafa;
   --color-surface-white: #ffffff;
@@ -70,7 +70,7 @@
   --shadow-md:    0 4px 16px rgba(0, 38, 43, 0.08), 0 1px 4px rgba(0, 38, 43, 0.05);
   --shadow-lg:    0 8px 32px rgba(0, 38, 43, 0.10), 0 2px 8px rgba(0, 38, 43, 0.06);
   --shadow-focus-blue:   0 0 0 3px rgba(0, 106, 242, 0.18);
-  --shadow-focus-spring: 0 0 0 3px rgba(171, 255, 174, 0.35);
+  --shadow-focus-spring: 0 0 0 3px rgba(255, 159, 28, 0.35);
 
   /* ── Easing ─────────────────────────────────────────────── */
   --ease-snappy: cubic-bezier(0.22, 1, 0.36, 1);
@@ -325,7 +325,7 @@
     background: rgba(0, 38, 43, 0.92);
     backdrop-filter: blur(20px) saturate(1.4);
     -webkit-backdrop-filter: blur(20px) saturate(1.4);
-    border-bottom: 1px solid rgba(171, 255, 174, 0.08);
+    border-bottom: 1px solid rgba(255, 159, 28, 0.08);
   }
 
   /* ── Feature Card Hover ─────────────────────────────────── */
@@ -360,7 +360,7 @@
     box-shadow: 0 0 20px rgba(139, 57, 17, 0.25), 0 4px 12px rgba(139, 57, 17, 0.15);
   }
   .icon-glow-green {
-    box-shadow: 0 0 20px rgba(29, 107, 42, 0.25), 0 4px 12px rgba(29, 107, 42, 0.15);
+    box-shadow: 0 0 20px rgba(255, 159, 28, 0.25), 0 4px 12px rgba(255, 159, 28, 0.15);
   }
 
   /* ── Marquee Strip ──────────────────────────────────────── */
@@ -426,8 +426,8 @@
   .bg-grid-dark {
     background-size: 32px 32px;
     background-image:
-      linear-gradient(to right, rgba(171, 255, 174, 0.04) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(171, 255, 174, 0.04) 1px, transparent 1px);
+      linear-gradient(to right, rgba(255, 159, 28, 0.04) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 159, 28, 0.04) 1px, transparent 1px);
   }
 
   /* ── Dot Pattern Background ─────────────────────────────── */
@@ -458,7 +458,7 @@
   /* ── Sidebar Dark Glass ─────────────────────────────────── */
   .sidebar-dark {
     background: linear-gradient(180deg, #011d21 0%, #00262b 100%);
-    border-right: 1px solid rgba(171, 255, 174, 0.08);
+    border-right: 1px solid rgba(255, 159, 28, 0.08);
   }
 
   /* ── Text Gradient ──────────────────────────────────────── */
@@ -470,7 +470,7 @@
   }
 
   .text-gradient-green {
-    background: linear-gradient(135deg, #abffae 0%, #1d6b2a 100%);
+    background: linear-gradient(135deg, #ff9f1c 0%, #8b3911 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -486,7 +486,7 @@
     inset: -1px;
     border-radius: inherit;
     padding: 1px;
-    background: linear-gradient(135deg, rgba(0,106,242,0.4), rgba(171,255,174,0.4));
+    background: linear-gradient(135deg, rgba(0,106,242,0.4), rgba(255,159,28,0.4));
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
@@ -692,7 +692,7 @@
   .bg-topo {
     background-image:
       radial-gradient(circle at 20% 80%, rgba(0,106,242,0.04) 0%, transparent 40%),
-      radial-gradient(circle at 80% 20%, rgba(171,255,174,0.05) 0%, transparent 40%),
+      radial-gradient(circle at 80% 20%, rgba(255, 159, 28, 0.05) 0%, transparent 40%),
       repeating-linear-gradient(
         -45deg,
         transparent,
@@ -712,7 +712,7 @@
   }
   .bg-mesh-green {
     background-image:
-      radial-gradient(circle at 10% 90%, rgba(171,255,174,0.07) 0%, transparent 35%),
+      radial-gradient(circle at 10% 90%, rgba(255, 159, 28, 0.07) 0%, transparent 35%),
       radial-gradient(circle at 90% 10%, rgba(0,106,242,0.05) 0%, transparent 35%),
       radial-gradient(circle at 50% 50%, rgba(0,38,43,0.02) 0%, transparent 60%);
   }

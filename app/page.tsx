@@ -96,9 +96,9 @@ const FEATURES = [
       "Arahkan kursor ke jargon kaku seperti Wanprestasi atau Force Majeure di dalam dokumen untuk mendapatkan penjelasan analogi sehari-hari secara instan.",
     href: "/dashboard?tab=glossary",
     cta: "Lihat Kamus",
-    accentColor: "#1d6b2a",
-    accentBg: "rgba(29, 107, 42, 0.07)",
-    accentBorder: "rgba(29, 107, 42, 0.15)",
+    accentColor: "#ff9f1c",
+    accentBg: "rgba(255, 159, 28, 0.07)",
+    accentBorder: "rgba(255, 159, 28, 0.15)",
     badge: "22 Istilah",
   },
 ];
@@ -123,7 +123,7 @@ const STEPS = [
     icon: BookOpen,
     title: "Pelajari Temuan",
     desc: "Telusuri Red Flags dan pelajari jargon hukum melalui tooltip interaktif.",
-    color: "#1d6b2a",
+    color: "#ff9f1c",
   },
   {
     num: "04",
@@ -233,8 +233,10 @@ function useChartVisible() {
 }
 
 // ── Animated counter hook ──
-function useCountUp(target: number, duration = 1800, start = false) {
+function useCountUp(target: number, duration = 1800, start = false, keepLive = false) {
   const [count, setCount] = useState(0);
+  const [liveCount, setLiveCount] = useState(0);
+
   useEffect(() => {
     if (!start) return;
     let startTime: number | null = null;
@@ -242,12 +244,23 @@ function useCountUp(target: number, duration = 1800, start = false) {
       if (!startTime) startTime = timestamp;
       const progress = Math.min((timestamp - startTime) / duration, 1);
       const ease = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.floor(ease * target));
+      const current = Math.floor(ease * target);
+      setCount(current);
+      setLiveCount(current);
       if (progress < 1) requestAnimationFrame(step);
     };
     requestAnimationFrame(step);
   }, [target, duration, start]);
-  return count;
+
+  useEffect(() => {
+    if (!start || !keepLive || count < target) return;
+    const interval = setInterval(() => {
+      setLiveCount((prev) => prev + Math.floor(Math.random() * 2) + 1);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [start, keepLive, count, target]);
+
+  return keepLive ? liveCount : count;
 }
 
 const parseMarkdownToHtml = (md: string): string => {
@@ -431,7 +444,7 @@ function AnimatedBarChart() {
             <h4 className="text-sm font-extrabold text-midnight-ink uppercase tracking-wide">Kontrak UMKM Terlindungi</h4>
             <p className="text-xs text-slate-grille mt-0.5">Pertumbuhan akumulatif dokumen yang diamankan.</p>
           </div>
-          <span className="text-xs font-bold text-[#1d6b2a] bg-[#eafde8] px-2.5 py-1 rounded-full border border-spring-leaf/30 shrink-0">15K+ Aktif</span>
+          <span className="text-xs font-bold text-spring-leaf bg-pale-mint px-2.5 py-1 rounded-full border border-spring-leaf/30 shrink-0">15K+ Aktif</span>
         </div>
         <div className="flex items-end justify-around h-48 pb-6 pt-8 bg-fog-gray/30 rounded-xl border border-border-light/50 px-4 gap-3">
           {bars.map((bar, i) => (
@@ -474,6 +487,16 @@ export default function Home() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [statsVisible, setStatsVisible] = useState(false);
   const [scrollY, setScrollY] = useState(0);
+  const heroRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!heroRef.current) return;
+    const rect = heroRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    heroRef.current.style.setProperty("--mouse-x", `${x}px`);
+    heroRef.current.style.setProperty("--mouse-y", `${y}px`);
+  };
 
   // Playground state
   const [activePlaygroundTab, setActivePlaygroundTab] = useState<"scan" | "generate">("scan");
@@ -499,7 +522,7 @@ export default function Home() {
 
   const statsRef = useRef<HTMLDivElement>(null);
 
-  const countDocs = useCountUp(15000, 1800, statsVisible);
+  const countDocs = useCountUp(15000, 1800, statsVisible, true);
   const countAccuracy = useCountUp(994, 1800, statsVisible);
   const countTime = useCountUp(5, 1200, statsVisible);
 
@@ -935,7 +958,32 @@ h3 {
     <div className="min-h-screen bg-canvas font-sans antialiased text-midnight-ink overflow-x-hidden">
 
       {/* ─────────────────── HERO ─────────────────── */}
-      <section id="hero" className="relative overflow-hidden pt-12 pb-32">
+      <section id="hero" ref={heroRef} onMouseMove={handleMouseMove} className="relative overflow-hidden pt-12 pb-32">
+        {/* Mouse Move Radial Glows */}
+        <div
+          className="absolute pointer-events-none opacity-40 mix-blend-screen transition-all duration-300 ease-out"
+          style={{
+            width: "550px",
+            height: "550px",
+            left: "calc(var(--mouse-x, 50%) - 275px)",
+            top: "calc(var(--mouse-y, 50%) - 275px)",
+            background: "radial-gradient(circle, rgba(255, 159, 28, 0.12) 0%, transparent 70%)",
+            filter: "blur(50px)",
+          }}
+        />
+        <div
+          className="absolute pointer-events-none opacity-30 mix-blend-screen transition-all duration-500 ease-out"
+          style={{
+            width: "450px",
+            height: "450px",
+            left: "calc(var(--mouse-x, 50%) - 225px)",
+            top: "calc(var(--mouse-y, 50%) - 225px)",
+            background: "radial-gradient(circle, rgba(0, 106, 242, 0.08) 0%, transparent 75%)",
+            filter: "blur(70px)",
+            transform: "translate(20px, 20px)",
+          }}
+        />
+
         {/* Grid background */}
         <div className="absolute inset-0 bg-grid-pattern opacity-60 pointer-events-none" />
 
@@ -950,7 +998,7 @@ h3 {
         <div
           className="absolute top-20 -right-32 w-[500px] h-[500px] pointer-events-none animate-aurora animation-delay-2000"
           style={{
-            background: "radial-gradient(ellipse at center, rgba(171,255,174,0.14) 0%, transparent 60%)",
+            background: "radial-gradient(ellipse at center, rgba(255, 159, 28, 0.14) 0%, transparent 60%)",
             transform: `translateY(${scrollY * -0.07}px)`,
           }}
         />
@@ -1001,8 +1049,8 @@ h3 {
                 Didukung Google Gemini AI
               </span>
               <span className="w-px h-3.5 bg-border-light" />
-              <span className="flex items-center gap-1 text-[#1d6b2a]">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse-dot inline-block" />
+              <span className="flex items-center gap-1 text-spring-leaf">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#ff9f1c] animate-pulse-dot inline-block" />
                 Aktif & Siap Digunakan
               </span>
             </div>
@@ -1173,7 +1221,7 @@ h3 {
                                 cy="18"
                                 r="14"
                                 fill="none"
-                                stroke={scanResult.skorKeamanan > 70 ? "#006af2" : scanResult.skorKeamanan > 50 ? "#1d6b2a" : "#8b3911"}
+                                stroke={scanResult.skorKeamanan > 70 ? "#006af2" : scanResult.skorKeamanan > 50 ? "#ff9f1c" : "#8b3911"}
                                 strokeWidth="3"
                                 strokeDasharray={`${scanResult.skorKeamanan} 100`}
                                 strokeLinecap="round"
@@ -1225,8 +1273,8 @@ h3 {
                                 <p className="text-[10.5px] text-slate-grille">
                                   <b className="text-midnight-ink">Bahaya:</b> {flag.alasanBahaya}
                                 </p>
-                                <p className="text-[10.5px] text-[#1d6b2a] font-medium bg-emerald-50/50 p-2 rounded border border-emerald-100/50">
-                                  <b className="text-[#1d6b2a]">Saran Revisi:</b> {flag.usulanRevisi}
+                                <p className="text-[10.5px] text-amber-700 font-medium bg-amber-50/50 p-2 rounded border border-amber-100/50">
+                                  <b className="text-amber-700">Saran Revisi:</b> {flag.usulanRevisi}
                                 </p>
                               </div>
                             ))
@@ -1360,7 +1408,7 @@ h3 {
                           
                           <button
                             onClick={handlePrintPDFPlayground}
-                            className="inline-flex items-center gap-1 text-[10px] font-bold text-[#1d6b2a] hover:underline cursor-pointer bg-transparent border-0 font-sans"
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-spring-leaf hover:underline cursor-pointer bg-transparent border-0 font-sans"
                           >
                             <FileText className="w-3 h-3" />
                             Cetak PDF
@@ -1404,8 +1452,8 @@ h3 {
               {/* Left badge */}
               <div className="absolute -top-6 -left-8">
                 <div className="floating-card px-4 py-2.5 flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-[#eafde8] flex items-center justify-center shrink-0">
-                    <CheckCircle2 className="w-4 h-4 text-[#1d6b2a]" />
+                  <div className="w-8 h-8 rounded-lg bg-pale-mint flex items-center justify-center shrink-0">
+                    <CheckCircle2 className="w-4 h-4 text-[#8b3911]" />
                   </div>
                   <div>
                     <p className="text-[10px] font-bold text-midnight-ink">SPK Berhasil Dibuat</p>
@@ -1416,7 +1464,7 @@ h3 {
               {/* Right badge */}
               <div className="absolute -top-6 -right-8">
                 <div className="floating-card px-4 py-2.5 flex items-center gap-2.5" style={{ background: "rgba(0,38,43,0.95)" }}>
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(171,255,174,0.15)" }}>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(255,159,28,0.15)" }}>
                     <TrendingUp className="w-4 h-4 text-spring-leaf" />
                   </div>
                   <div>
@@ -1442,7 +1490,7 @@ h3 {
         {/* Decorative ghost shapes */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full opacity-[0.04]" style={{ background: "radial-gradient(circle, #006af2 0%, transparent 70%)" }} />
-          <div className="absolute bottom-0 -left-24 w-72 h-72 rounded-full opacity-[0.04]" style={{ background: "radial-gradient(circle, #abffae 0%, transparent 70%)" }} />
+          <div className="absolute bottom-0 -left-24 w-72 h-72 rounded-full opacity-[0.04]" style={{ background: "radial-gradient(circle, #ff9f1c 0%, transparent 70%)" }} />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full opacity-[0.025] border border-midnight-ink" />
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] rounded-full opacity-[0.015] border border-midnight-ink" />
         </div>
@@ -1503,8 +1551,8 @@ h3 {
                       <p className="text-[10px] text-slate-grille">Hasil Analisis Instan</p>
                     </div>
                     <div className="ml-auto flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse-dot" />
-                      <span className="text-[10px] font-semibold text-green-600">Online</span>
+                      <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse-dot" />
+                      <span className="text-[10px] font-semibold text-amber-600">Online</span>
                     </div>
                   </div>
 
@@ -1545,14 +1593,14 @@ h3 {
                   </div>
 
                   {/* Suggestion */}
-                  <div className="p-3 rounded-xl border border-spring-leaf/30 bg-[#f0fdf0] text-[11px] text-[#1d6b2a] leading-relaxed">
-                    <span className="font-bold">✓ Usulan Revisi AI:</span> Tambahkan batasan maksimal denda 5% dari nilai kontrak dan kewajiban DP 30% sebelum pekerjaan dimulai.
+                  <div className="p-3 rounded-xl border border-spring-leaf/30 bg-pale-mint text-[11px] text-[#8b3911] leading-relaxed">
+                    <span className="font-bold text-[#8b3911]">✓ Usulan Revisi AI:</span> Tambahkan batasan maksimal denda 5% dari nilai kontrak dan kewajiban DP 30% sebelum pekerjaan dimulai.
                   </div>
                 </div>
 
                 {/* Decorative floating element */}
                 <div className="absolute -top-6 -right-6 w-24 h-24 rounded-2xl opacity-20 pointer-events-none animate-float-slow"
-                  style={{ background: "linear-gradient(135deg, #006af2, #abffae)", transform: "rotate(12deg)" }} />
+                  style={{ background: "linear-gradient(135deg, #006af2, #ff9f1c)", transform: "rotate(12deg)" }} />
                 <div className="absolute -bottom-4 -left-4 w-16 h-16 rounded-xl opacity-15 pointer-events-none animate-float animation-delay-700"
                   style={{ background: "linear-gradient(135deg, #8b3911, #ff8c5a)", transform: "rotate(-8deg)" }} />
               </div>
@@ -1569,13 +1617,13 @@ h3 {
         <div className="section-container relative z-10">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-0">
             {[
-              { value: countDocs > 0 ? `${countDocs.toLocaleString()}+` : "15.000+", label: "Pelaku UMKM Terlindungi", icon: Users, color: "#abffae" },
-              { value: `${(countAccuracy / 10).toFixed(1)}%`, label: "Akurasi Scanning Hukum AI", icon: Shield, color: "#abffae", border: true },
-              { value: `< ${countTime || 5} Mnt`, label: "Kecepatan Pembuatan SPK", icon: Clock, color: "#abffae" },
+              { value: countDocs > 0 ? `${countDocs.toLocaleString()}+` : "15.000+", label: "Pelaku UMKM Terlindungi", icon: Users, color: "#ff9f1c" },
+              { value: `${(countAccuracy / 10).toFixed(1)}%`, label: "Akurasi Scanning Hukum AI", icon: Shield, color: "#ff9f1c", border: true },
+              { value: `< ${countTime || 5} Mnt`, label: "Kecepatan Pembuatan SPK", icon: Clock, color: "#ff9f1c" },
             ].map((s, i) => (
               <div key={i} className={`text-center py-8 sm:py-6 px-6 ${s.border ? "sm:border-x border-white/10 border-y sm:border-y-0 py-8" : ""}`}>
                 <div className="flex justify-center mb-3">
-                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(171,255,174,0.1)", border: "1px solid rgba(171,255,174,0.15)" }}>
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(255,159,28,0.1)", border: "1px solid rgba(255,159,28,0.15)" }}>
                     <s.icon className="w-5 h-5" style={{ color: s.color }} />
                   </div>
                 </div>
@@ -1618,7 +1666,7 @@ h3 {
             {FEATURES.map((f, i) => (
               <RevealOnScroll key={i} delay={i * 150}>
                 <div
-                  className="group relative bg-white rounded-2xl border border-border-light p-7 flex flex-col gap-5 transition-shadow duration-300 shadow-sm hover:shadow-lg"
+                  className="group relative bg-white rounded-2xl border border-border-light p-7 flex flex-col gap-5 transition-all duration-300 shadow-sm hover:shadow-lg hover:scale-[1.02] hover:border-spring-leaf cursor-pointer"
                 >
                   {/* Top badge */}
                   <div className="flex items-center justify-between">
@@ -1661,13 +1709,13 @@ h3 {
         {/* Animated accent glows */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute -top-20 left-1/4 w-80 h-80 animate-particle-a animation-delay-1000" style={{ background: "radial-gradient(circle, rgba(0,106,242,0.05) 0%, transparent 65%)" }} />
-          <div className="absolute bottom-0 right-1/4 w-64 h-64 animate-particle-c animation-delay-2000" style={{ background: "radial-gradient(circle, rgba(171,255,174,0.06) 0%, transparent 65%)" }} />
+          <div className="absolute bottom-0 right-1/4 w-64 h-64 animate-particle-c animation-delay-2000" style={{ background: "radial-gradient(circle, rgba(255,159,28,0.06) 0%, transparent 65%)" }} />
           <div className="absolute top-1/2 -right-16 w-48 h-48 animate-particle-b animation-delay-500" style={{ background: "radial-gradient(circle, rgba(0,106,242,0.04) 0%, transparent 65%)" }} />
         </div>
         <div className="section-container space-y-16 relative z-10">
           <RevealOnScroll>
             <div className="text-center space-y-4 max-w-2xl mx-auto">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#eafde8] rounded-full border border-spring-leaf/30 text-xs font-bold text-[#1d6b2a] uppercase tracking-widest">
+              <div className="inline-flex items-center gap-2 px-3 py-1 bg-pale-mint rounded-full border border-spring-leaf/30 text-xs font-bold text-[#8b3911] uppercase tracking-widest">
                 <CheckCircle2 className="w-3 h-3" />
                 Mengapa Memilih Kami
               </div>
@@ -1725,7 +1773,7 @@ h3 {
         <div
           className="absolute bottom-1/4 right-10 w-[450px] h-[450px] rounded-full pointer-events-none filter blur-[100px] opacity-[0.05] transition-transform duration-100"
           style={{
-            background: "radial-gradient(circle, #abffae 0%, transparent 70%)",
+            background: "radial-gradient(circle, #ff9f1c 0%, transparent 70%)",
             transform: `translateY(${scrollY * -0.06}px)`
           }}
         />
@@ -1806,7 +1854,7 @@ h3 {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-4xl mx-auto">
             {[
               { label: "Akurasi AI", value: "99.4%", sub: "Uji coba 1.200 dokumen", color: "#006af2" },
-              { label: "UMKM Terlindungi", value: "15K+", sub: "Per Mei 2026", color: "#1d6b2a" },
+              { label: "UMKM Terlindungi", value: "15K+", sub: "Per Mei 2026", color: "#ff9f1c" },
               { label: "Jenis Red Flag", value: "6+", sub: "Pasal jebakan terdeteksi", color: "#8b3911" },
               { label: "Waktu Analisis", value: "<30s", sub: "Per dokumen rata-rata", color: "#006af2" },
             ].map((stat, i) => (
@@ -1826,7 +1874,7 @@ h3 {
       <section className="py-24 bg-canvas border-t border-border-light overflow-hidden relative bg-mesh-green">
         {/* Subtle animated glow blobs */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-64 animate-particle-a animation-delay-1500" style={{ background: "radial-gradient(ellipse at top, rgba(171,255,174,0.04) 0%, transparent 70%)" }} />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-64 animate-particle-a animation-delay-1500" style={{ background: "radial-gradient(ellipse at top, rgba(255, 159, 28, 0.04) 0%, transparent 70%)" }} />
           <div className="absolute bottom-0 right-0 w-96 h-96 animate-particle-d animation-delay-2500" style={{ background: "radial-gradient(circle, rgba(0,106,242,0.04) 0%, transparent 65%)" }} />
         </div>
         <div className="space-y-12 relative z-10">
@@ -1886,7 +1934,7 @@ h3 {
       <section className="py-24 bg-white border-t border-border-light relative overflow-hidden bg-diagonal-stripes">
         {/* Corner glow accents */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute top-0 right-0 w-72 h-72 animate-particle-b animation-delay-1000" style={{ background: "radial-gradient(circle at top right, rgba(171,255,174,0.05) 0%, transparent 60%)" }} />
+          <div className="absolute top-0 right-0 w-72 h-72 animate-particle-b animation-delay-1000" style={{ background: "radial-gradient(circle at top right, rgba(255, 159, 28, 0.05) 0%, transparent 60%)" }} />
           <div className="absolute bottom-0 left-0 w-56 h-56 animate-particle-c animation-delay-3000" style={{ background: "radial-gradient(circle at bottom left, rgba(0,106,242,0.04) 0%, transparent 60%)" }} />
         </div>
         <div className="section-container space-y-16 relative z-10">
@@ -1982,15 +2030,15 @@ h3 {
       <section className="py-24 relative overflow-hidden" style={{ background: "linear-gradient(135deg, #00262b 0%, #011f24 60%, #0b363b 100%)" }}>
         <div className="absolute inset-0 bg-dot-pattern opacity-[0.06] pointer-events-none" />
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[300px] pointer-events-none"
-          style={{ background: "radial-gradient(ellipse at top, rgba(171,255,174,0.08) 0%, transparent 70%)" }} />
+          style={{ background: "radial-gradient(ellipse at top, rgba(255,159,28,0.08) 0%, transparent 70%)" }} />
         {/* Elegant top & bottom radial glow accents */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute top-[10%] left-[5%] w-80 h-80 opacity-[0.05]" style={{ background: "radial-gradient(circle, #abffae 0%, transparent 70%)" }} />
+          <div className="absolute top-[10%] left-[5%] w-80 h-80 opacity-[0.05]" style={{ background: "radial-gradient(circle, #ff9f1c 0%, transparent 70%)" }} />
           <div className="absolute bottom-[10%] right-[5%] w-96 h-96 opacity-[0.05]" style={{ background: "radial-gradient(circle, #006af2 0%, transparent 70%)" }} />
         </div>
 
         <div className="section-container relative z-10 text-center space-y-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold" style={{ background: "rgba(171,255,174,0.08)", borderColor: "rgba(171,255,174,0.2)", color: "#abffae" }}>
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-semibold" style={{ background: "rgba(255,159,28,0.08)", borderColor: "rgba(255,159,28,0.2)", color: "#ff9f1c" }}>
             <Sparkles className="w-3 h-3" />
             Gratis · Tidak Perlu Kartu Kredit
           </div>
@@ -2006,7 +2054,7 @@ h3 {
             <Link
               href={isLoggedIn ? "/dashboard?tab=analyzer" : "/login?redirect=/dashboard?tab=analyzer"}
               className="btn-primary px-8 py-3.5 text-sm font-bold flex items-center gap-2 shadow-sm hover:shadow-md"
-              style={{ background: "#abffae", color: "#00262b" }}
+              style={{ background: "#ff9f1c", color: "#00262b" }}
             >
               <Shield className="w-4 h-4" />
               Scan Kontrak Sekarang

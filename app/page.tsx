@@ -1080,7 +1080,7 @@ h3 {
             <div className="animate-fade-up animation-delay-200 flex flex-wrap items-center justify-center gap-3">
               <Link
                 href={isLoggedIn ? "/dashboard?tab=analyzer" : "/login?redirect=/dashboard?tab=analyzer"}
-                className="btn-primary px-7 py-3.5 text-sm font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all hover:-translate-y-0.5"
+                className="btn-primary px-7 py-3.5 text-sm font-bold flex items-center gap-2 shadow-md hover:shadow-lg transition-all hover:opacity-90"
               >
                 <Shield className="w-4 h-4 text-spring-leaf" />
                 Scan Kontrak Sekarang
@@ -1088,7 +1088,7 @@ h3 {
               </Link>
               <Link
                 href={isLoggedIn ? "/dashboard?tab=wizard" : "/login?redirect=/dashboard?tab=wizard"}
-                className="btn-outline px-7 py-3.5 text-sm font-semibold flex items-center gap-2 hover:-translate-y-0.5 transition-all"
+                className="btn-outline px-7 py-3.5 text-sm font-semibold flex items-center gap-2 hover:bg-slate-50 transition-all"
               >
                 Buat Draf SPK Gratis
                 <FileText className="w-4 h-4 text-electric-blue" />
@@ -1666,7 +1666,7 @@ h3 {
             {FEATURES.map((f, i) => (
               <RevealOnScroll key={i} delay={i * 150}>
                 <div
-                  className="group relative bg-white rounded-2xl border border-border-light p-7 flex flex-col gap-5 transition-all duration-300 shadow-sm hover:shadow-lg hover:scale-[1.02] hover:border-spring-leaf cursor-pointer"
+                  className="group relative bg-white rounded-2xl border border-border-light p-7 flex flex-col gap-5 transition-all duration-300 shadow-sm hover:shadow-md hover:border-spring-leaf hover:opacity-95 cursor-pointer"
                 >
                   {/* Top badge */}
                   <div className="flex items-center justify-between">
@@ -1859,7 +1859,7 @@ h3 {
               { label: "Waktu Analisis", value: "<30s", sub: "Per dokumen rata-rata", color: "#006af2" },
             ].map((stat, i) => (
               <RevealOnScroll key={i} delay={i * 80} direction="scale">
-                <div className="bg-white rounded-xl border border-border-light p-4 text-center space-y-1 shadow-xs hover:shadow-md transition-all hover:-translate-y-1">
+                <div className="bg-white rounded-xl border border-border-light p-4 text-center space-y-1 shadow-xs hover:shadow-md transition-all hover:opacity-90">
                   <p className="text-2xl font-extrabold tracking-tighter" style={{ color: stat.color }}>{stat.value}</p>
                   <p className="text-[11px] font-bold text-midnight-ink">{stat.label}</p>
                   <p className="text-[9px] text-slate-grille">{stat.sub}</p>
@@ -2072,12 +2072,10 @@ h3 {
       {/* ─────────────────── FOOTER ─────────────────── */}
       <footer className="border-t border-white/10 py-10" style={{ background: "#011d21" }}>
         <div className="section-container flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-md bg-[#00262b] border border-spring-leaf/20 flex items-center justify-center">
-              <Scale className="w-3.5 h-3.5 text-spring-leaf" />
-            </div>
-            <span className="text-sm font-bold text-white">
-              KontrakPintar<span className="text-spring-leaf">AI</span>
+          <div className="flex items-center">
+            <span className="text-sm font-bold text-white tracking-tight">
+              Kontrak<span className="text-spring-leaf">Pintar</span>
+              <span className="text-[10px] font-bold text-white/50 ml-1 align-top mt-0.5 inline-block">AI</span>
             </span>
           </div>
 

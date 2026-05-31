@@ -93,32 +93,45 @@ export default function Navbar() {
 
   return (
     <header
-      className="sticky top-0 z-50 transition-all duration-300"
+      className="sticky z-50 left-0 right-0 mx-auto"
       style={{
+        top: scrolled ? "12px" : "0px",
+        width: scrolled ? "calc(100% - 2rem)" : "100%",
+        maxWidth: scrolled ? "1150px" : "100%",
+        borderRadius: scrolled ? "9999px" : "0px",
         background: scrolled
-          ? "rgba(255, 255, 255, 0.92)"
+          ? "rgba(255, 255, 255, 0.55)"
           : "rgba(255, 255, 255, 0.80)",
-        backdropFilter: "blur(16px)",
-        WebkitBackdropFilter: "blur(16px)",
-        borderBottom: scrolled
-          ? "1px solid rgba(0, 38, 43, 0.08)"
+        backdropFilter: "blur(24px)",
+        WebkitBackdropFilter: "blur(24px)",
+        border: scrolled
+          ? "1px solid rgba(0, 38, 43, 0.09)"
           : "1px solid rgba(0, 38, 43, 0.05)",
         boxShadow: scrolled
-          ? "0 1px 16px rgba(0, 38, 43, 0.07)"
+          ? "0 10px 30px rgba(0, 38, 43, 0.08)"
           : "none",
+        transition: "all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1)",
       }}
     >
-      <div className="max-w-7xl mx-auto px-5 py-3 flex justify-between items-center">
+      <div 
+        className="max-w-7xl mx-auto flex justify-between items-center transition-all duration-500"
+        style={{
+          paddingLeft: scrolled ? "24px" : "20px",
+          paddingRight: scrolled ? "24px" : "20px",
+          paddingTop: scrolled ? "10px" : "16px",
+          paddingBottom: scrolled ? "10px" : "16px",
+        }}
+      >
 
         {/* Logo and Status */}
         <div className="flex items-center gap-3">
           <Link
             href={isLoggedIn ? "/dashboard?tab=overview" : "/"}
-            className="flex items-center gap-2.5 group select-none"
+            className="flex items-center group select-none"
           >
-            <span className="text-[15px] font-bold text-[#00262b] tracking-tight">
+            <span className="text-[16px] font-bold text-[#00262b] tracking-tight">
               Kontrak<span className="text-[#006af2]">Pintar</span>
-              <span className="text-[10px] font-bold text-[#354d51] ml-1 align-top mt-0.5 inline-block">AI</span>
+              <span className="text-[11px] font-bold text-[#354d51] ml-1 align-top mt-0.5 inline-block">AI</span>
             </span>
           </Link>
         </div>

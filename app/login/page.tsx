@@ -349,12 +349,10 @@ function LoginPageContent() {
         <Card className="p-6 border border-slate-200 bg-white shadow-xs rounded-xl">
           {/* Brand / Logo */}
           <div className="flex flex-col items-center mb-6 text-center select-none">
-            <Link href="/" className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-lg bg-[#00262b] flex items-center justify-center border border-white/10 shadow-sm">
-                <Scale className="w-4.5 h-4.5 text-[#ff9f1c]" />
-              </div>
-              <span className="text-base font-bold text-[#00262b] tracking-tight">
+            <Link href="/" className="flex items-center mb-2">
+              <span className="text-xl font-bold text-[#00262b] tracking-tight">
                 Kontrak<span className="text-[#006af2]">Pintar</span>
+                <span className="text-xs font-bold text-[#354d51] ml-1 align-top mt-0.5 inline-block">AI</span>
               </span>
             </Link>
             <p className="text-[10.5px] text-slate-grille">
